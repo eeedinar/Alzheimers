@@ -12,6 +12,7 @@ import numpy as np
 import pylab as plt
 import matplotlib.backends.backend_pdf                        # pdf generation package
 import ipywidgets 
+from PyPDF2 import PdfFileMerger
 
 # Lin Yang's BNL packages for 1-d averaging
 from py4xs.hdf import h5xs,h5exp,lsh5
@@ -193,7 +194,7 @@ def plot_heat_map_from_file(file, qgrid, scatterings = None, args = None):
 
 def cwd_files_type_search(file_type):
     """
-        files_sorted = cwd_file_type_search('.h5')
+        files_sorted = cwd_files_type_search('.h5')
     """
     files = []
     for file in [each for each in os.listdir(os.getcwd()) if each.endswith(file_type)]:
@@ -234,13 +235,37 @@ def get_json_str_data(file):
         data = json.loads(data)     # convert json formatted string into python dictionary
     return data
 
+### set patch attributes
+def set_patch_attributes(file, patches):
+    """
+        set_patch_attributes(file, patches)
+    """
+    with h5py.File(file,'r+') as hdf:
+        
+        dset = hdf.get(f'{h5_top_group(file)}/processed')              # Iq = hdf.get('2048_B16/processed')
+        dset.attrs['patches'] = json.dumps(patches)
+
+    return "patching information written on the h5 file processed directory"
+
+### get patch attributes
+def get_patch_attributes(file):
+    """
+        patches = get_patch_attributes(file)
+    """
+    with h5py.File(file,'r') as hdf:
+        
+        dset = hdf.get(f'{h5_top_group(file)}/processed')              # Iq = hdf.get('2048_B16/processed')
+        patches = json.loads(dset.attrs['patches'])    
+    
+    return patches
+
 ### circular averaging after patching
 def circ_avg_from_patches(source_file, patches):
     """
         masked_file = circ_avg_from_patches(source_file, patches)
     """
     ## specs
-    masked_file = f'{source_file.split(".")[0]}_masked.h5'
+    masked_file = f'{h5_top_group(source_file)}_masked.h5'
 
     ## computation
     if os.path.isfile(masked_file):
@@ -257,7 +282,7 @@ def circ_avg_from_patches(source_file, patches):
         # read _WAXS2 source data, replace masked data and save masked out data on _WAXS2
         with h5py.File(masked_file,'r+') as hdf:
             try:
-                dset = hdf.get(f'{masked_file.split("_masked")[0]}')
+                dset = hdf.get(f'{h5_top_group(masked_file)}')
                 del dset['processed']
                 #del dset["_SAXS"], dset["_WAXS2"], dset["merged"]
             except:
@@ -265,7 +290,7 @@ def circ_avg_from_patches(source_file, patches):
 
             tic = time.perf_counter();     
             print(f'{masked_file} Loading data into a numpy array started ')
-            dset = dset.get(f'/{masked_file.split("_masked")[0]}/primary/data')
+            dset = dset.get(f'/{h5_top_group(masked_file)}/primary/data')
             dset_waxs = np.array(dset.get('pilW2_image'))        # np.array(dset.get('pilW2_image')), dset.get('pilW2_image')[...] 
             del dset['pilW2_image']
             print(f'{masked_file} Loading data into a numpy array finished in {time.perf_counter()-tic} seconds')
@@ -279,10 +304,10 @@ def circ_avg_from_patches(source_file, patches):
             print(f'{masked_file} Patching Finished')
 
             tic = time.perf_counter();     
-            print(f'{masked_file} file saving staring ... ')
+            print(f'{masked_file} patched pilW2_image dataset creation staring ... ')
             # 'lzf' (no compression_opts), chunks=(1,1043,981), compression_opts=1
             dset.create_dataset('pilW2_image', data = dset_waxs, compression="gzip", compression_opts=1)  
-            print(f'{masked_file} file saving finished in {time.perf_counter()-tic} seconds')
+            print(f'{masked_file} patched pilW2_image dataset creation finished in {time.perf_counter()-tic} seconds')
 
         ## create 1d data from lin Yang's code (py4xs packages are used here)
         de = h5exp("exp.h5")
@@ -290,9 +315,12 @@ def circ_avg_from_patches(source_file, patches):
 
         dt  = h5xs(f'{masked_file}', [de.detectors, qgrid2])
         tic = time.perf_counter()
-        print(f'Circular averaging staring now ... ')
+        print(f'Circular averaging starts now ... ')
         dt.load_data(N=8)
-        print(f'{masked_file}total 1-d averaging time {time.perf_counter() - tic} seconds')
+        print(f'{masked_file} total 1-d averaging time {time.perf_counter() - tic} seconds')
+
+        ## setting patch attributes on the processed folder
+        set_patch_attributes(masked_file, patches)
 
         return masked_file
 
@@ -344,7 +372,7 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
             y_test = y[limit_l:limit_u]       # extract the narrow region for y
             
             max_ind = np.argmax( y_test - np.polyval(coefs, X_test))
-            print(f'{comment} max-point to fitting-point difference - {np.max( y_test - np.polyval(coefs, X_test))}') 
+            print(f'{comment} max-point to fitting-point difference:  {np.max( y_test - np.polyval(coefs, X_test))}') 
             
             ## plot polynomial and heat map
             axs[0, idx_indices].clear()
@@ -369,7 +397,7 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
 
     #        f.colorbar(pos, ax= axs[1, idx_indices])
 
-        plt.suptitle('Polyfit and Heat maps')
+        plt.suptitle(f'{h5_top_group(file)} Polyfit and Heat maps')
         plt.tight_layout()
         plt.show()
     
@@ -386,3 +414,31 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
     @ipywidgets.interact_manual(description="savepdf")
     def foo():
         f.savefig(f"{file}.pdf")
+
+def pdfs_merging(directory = '', output = 'result.pdf'):
+    """
+        merge all pdfs in the current directory :
+            directory = '', output = 'result.pdf')
+        merge all pdfs in the /PDF directory : 
+            directory = '/PDF', output = 'result.pdf')
+    """
+    root_dir = os.getcwd()
+    print(f'Current location {root_dir}')
+    try:
+        print(f'Changing to {root_dir}/{directory} directory ')
+        os.chdir(f'{root_dir}/{directory}')
+        pdfs = cwd_files_type_search('.pdf')
+        merger = PdfFileMerger()
+
+        for pdf in pdfs:
+            merger.append(pdf)
+        
+        merger.write(output)
+        merger.close()
+        print(f'{output} file written successfully')
+        os.chdir(root_dir)
+    except:
+        print('Either wrong directory or merging operation failed')
+        os.chdir(root_dir)
+
+    print('Back to root directory ', os.getcwd())
