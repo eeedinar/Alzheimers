@@ -1,24 +1,7 @@
-/*
-------- copy and paste this format -------
-
-    {
-      "file"            : ""     ,
-      "possible_plaque" :    ,
-      "possible_bkg"    :    ,
-      "patches"         : [
-
-                          ]   ,    
-      "comments"        : ""       
-    },
-
-
-*/
-
-'''
 {
   "files": [
     {
-      "file"            : "1934_B8.h5"     ,
+      "name"            : "1934_B8.h5"     ,
       "possible_plaque" : 4021   ,
       "possible_bkg"    : 4042   ,
       "patches"         : [
@@ -35,7 +18,7 @@
     },
 
     {
-      "file"            : "1934_SN.h5"     ,
+      "name"            : "1934_SN.h5"     ,
       "possible_plaque" : null      ,
       "possible_bkg"    : 4120   ,
       "patches"         : [
@@ -54,7 +37,7 @@
     },
 
     {
-      "file"            : "1934_SNa.h5"     ,
+      "name"            : "1934_SNa.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 282   ,
       "patches"         : [
@@ -73,7 +56,7 @@
     },
 
     {
-      "file"            : "1943_B1.h5"     ,
+      "name"            : "1943_B1.h5"     ,
       "possible_plaque" : 2100   ,
       "possible_bkg"    : 2338   ,
       "patches"         : [
@@ -90,7 +73,7 @@
     },
 
     {
-      "file"            : "1943_B1a.h5"     ,
+      "name"            : "1943_B1a.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 2002   ,
       "patches"         : [
@@ -105,7 +88,7 @@
     },
 
     {
-      "file"            : "2016_B8.h5"     ,
+      "name"            : "2016_B8.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 3580   ,
       "patches"         : [
@@ -126,7 +109,7 @@
     },
 
     {
-      "file"            : "2016_B8a.h5"     ,
+      "name"            : "2016_B8a.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 3548   ,
       "patches"         : [
@@ -145,7 +128,7 @@
     },
 
     {
-      "file"            : "2016_B8b.h5"     ,
+      "name"            : "2016_B8b.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 3322   ,
       "patches"         : [
@@ -164,7 +147,7 @@
 
 
     {
-      "file"            : "2016_B8c.h5"     ,
+      "name"            : "2016_B8c.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 1110   ,
       "patches"         : [
@@ -182,7 +165,7 @@
     },
 
     {
-      "file"            : "2047_B1.h5"     ,
+      "name"            : "2047_B1.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 3706   ,
       "patches"         : [
@@ -200,7 +183,7 @@
     },
 
     {
-      "file"            : "2047_B1a.h5"     ,
+      "name"            : "2047_B1a.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 1410   ,
       "patches"         : [
@@ -218,7 +201,7 @@
     },
     
     {
-      "file"            : "2048_B16.h5"     ,
+      "name"            : "2048_B16.h5"     ,
       "possible_plaque" : 1346   ,
       "possible_bkg"    : 2616   ,
       "patches"         : [
@@ -232,7 +215,7 @@
     },
 
     {
-      "file"            : "2048_B16a.h5"     ,
+      "name"            : "2048_B16a.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 2980   ,
       "patches"         : [
@@ -248,7 +231,7 @@
     },
 
     {
-      "file"            : "2048_B16b.h5"     ,
+      "name"            : "2048_B16b.h5"     ,
       "possible_plaque" : 3316   ,
       "possible_bkg"    : 2696   ,
       "patches"         : [
@@ -264,7 +247,7 @@
     },
 
     {
-      "file"            : "2048_B6.h5"     ,
+      "name"            : "2048_B6.h5"     ,
       "possible_plaque" : null   ,
       "possible_bkg"    : 3572   ,
       "patches"         : [
@@ -285,7 +268,7 @@
     },
 
     {
-      "file"            : "2048_B8.h5"     ,
+      "name"            : "2048_B8.h5"     ,
       "possible_plaque" : 2080   ,
       "possible_bkg"    : 2223   ,
       "patches"         : [
@@ -304,4 +287,3 @@
     }
   ]
 }
-'''
