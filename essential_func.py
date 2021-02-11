@@ -75,10 +75,7 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
             y = Iq[frame][idx_l:idx_u]
 
             # Find coefficients
-            cnt=0
-            while cnt<8:
-                coefs = np.polyfit(X,y,poly_ord)
-                cnt += 1
+            coefs = np.polyfit(X,y,poly_ord)
             #print(coefs)
 
             X_test = X[limit_l:limit_u]
@@ -370,10 +367,7 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
             X = qgrid2[idx_l:idx_u]           # get valid Iq values q rannge
             y = y[idx_l:idx_u]                # get valid Iq rannge
 
-            cnt=0
-            while cnt<8:
-                coefs = np.polyfit(X,y,poly_ord)  # fit polynomial
-                cnt += 1
+            coefs = np.polyfit(X,y,poly_ord)  # fit polynomial
 
             X_test = X[limit_l:limit_u]       # extract the narrow region for X
             y_test = y[limit_l:limit_u]       # extract the narrow region for y
