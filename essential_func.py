@@ -3,6 +3,7 @@
 Author: Abdullah Al Bashit
 Ph.D. Student in Electrical Engineering
 Northeastern University, Boston, MA
+Date: 01/01/2021
 """
 ########################### ---------- Essential functions ---------- ###########################
 
@@ -74,7 +75,10 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
             y = Iq[frame][idx_l:idx_u]
 
             # Find coefficients
-            coefs = np.polyfit(X,y,poly_ord)
+            cnt=0
+            while cnt<8:
+                coefs = np.polyfit(X,y,poly_ord)
+                cnt += 1
             #print(coefs)
 
             X_test = X[limit_l:limit_u]
@@ -366,7 +370,10 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
             X = qgrid2[idx_l:idx_u]           # get valid Iq values q rannge
             y = y[idx_l:idx_u]                # get valid Iq rannge
 
-            coefs = np.polyfit(X,y,poly_ord)  # fit polynomial
+            cnt=0
+            while cnt<8:
+                coefs = np.polyfit(X,y,poly_ord)  # fit polynomial
+                cnt += 1
 
             X_test = X[limit_l:limit_u]       # extract the narrow region for X
             y_test = y[limit_l:limit_u]       # extract the narrow region for y
@@ -411,7 +418,7 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
 
     ### save pdf widgets
     ipywidgets.interact_manual.opts['manual_name'] = 'Save PDF'
-    @ipywidgets.interact_manual(description="savepdf")
+    @ipywidgets.interact_manual()
     def foo():
         f.savefig(f"{file}.pdf")
 
