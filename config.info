@@ -6,6 +6,8 @@
      "possible_plaque" :    ,
      "possible_bkg"    :    ,
      "patches"         : [
+                             [[800, 0], [980, 150]],
+                             [[165, 0], 10]
                          ]   ,    
      "comments"        : ""       
    },
