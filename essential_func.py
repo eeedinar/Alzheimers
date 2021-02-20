@@ -8,7 +8,7 @@ Date: 01/01/2021
 ########################### ---------- Essential functions ---------- ###########################
 
 ## import packages    
-import os, shutil, h5py, time, json
+import os, shutil, h5py, time, json, cv2
 import numpy as np
 import pylab as plt
 import matplotlib.backends.backend_pdf                        # pdf generation package
@@ -19,6 +19,19 @@ from PyPDF2 import PdfFileMerger
 from py4xs.hdf import h5xs,h5exp,lsh5
 from py4xs.data2d import Data2d    
 
+## create 1d data from lin Yang's code (py4xs packages are used here)
+def azimuthal_averaging(file, qgrid, n_proc=8):
+    """
+        azimuthal_averaging(masked_file, qgrid, n_proc=8)
+    """
+    de = h5exp("exp.h5")
+    qgrid2 = np.hstack([np.arange(0.005, 0.0499, 0.001), np.arange(0.05, 0.099, 0.002), np.arange(0.1, 3.2, 0.005)])
+
+    dt  = h5xs(file, [de.detectors, qgrid])
+    tic = time.perf_counter()
+    print(f'Circular averaging starts now ... ')
+    dt.load_data(N=n_proc)
+    print(f'{file} total 1-d averaging time {time.perf_counter() - tic} seconds')
 
 
 ### valid indices search function
@@ -260,70 +273,7 @@ def get_patch_attributes(file):
     
     return patches
 
-### circular averaging after patching
-def circ_avg_from_patches(source_file, patches):
-    """
-        masked_file = circ_avg_from_patches(source_file, patches)
-    """
-    ## specs
-    masked_file = f'{h5_top_group(source_file)}_masked.h5'
 
-    ## computation
-    if os.path.isfile(masked_file):
-        print(f'DID not PATCH {masked_file} already exists - did not copy, ')
-        print(f'1-D Averaging is NOT performed as {masked_file} already exist ')
-        print(f'TO do patching on {masked_file} delete the file first manually and run this cell again')
-
-
-    else:
-        print(f'{masked_file} is being created in {os.getcwd()} ...')
-        shutil.copy2(source_file, masked_file)       # create a new file
-        print(f'{masked_file} copy is done')
-
-        # read _WAXS2 source data, replace masked data and save masked out data on _WAXS2
-        with h5py.File(masked_file,'r+') as hdf:
-            try:
-                dset = hdf.get(f'{h5_top_group(masked_file)}')
-                del dset['processed']
-                #del dset["_SAXS"], dset["_WAXS2"], dset["merged"]
-            except:
-                pass
-
-            tic = time.perf_counter();     
-            print(f'{masked_file} Loading data into a numpy array started ')
-            dset = dset.get(f'/{h5_top_group(masked_file)}/primary/data')
-            dset_waxs = np.array(dset.get('pilW2_image'))        # np.array(dset.get('pilW2_image')), dset.get('pilW2_image')[...] 
-            del dset['pilW2_image']
-            print(f'{masked_file} Loading data into a numpy array finished in {time.perf_counter()-tic} seconds')
-
-
-            # Loop over the data to mask out the patches
-            print(f'{masked_file} Patching Started ')
-            for frame in range(len(dset_waxs)):
-                for xy, width_p, height_p, color in patches:
-                    dset_waxs[frame][xy[1]: xy[1]+height_p, xy[0]: xy[0]+width_p] = 0   # height px and width px will not be counted img[0:70, 860:860+60]
-            print(f'{masked_file} Patching Finished')
-
-            tic = time.perf_counter();     
-            print(f'{masked_file} patched pilW2_image dataset creation staring ... ')
-            # 'lzf' (no compression_opts), chunks=(1,1043,981), compression_opts=1
-            dset.create_dataset('pilW2_image', data = dset_waxs, compression="gzip", compression_opts=1)  
-            print(f'{masked_file} patched pilW2_image dataset creation finished in {time.perf_counter()-tic} seconds')
-
-        ## create 1d data from lin Yang's code (py4xs packages are used here)
-        de = h5exp("exp.h5")
-        qgrid2 = np.hstack([np.arange(0.005, 0.0499, 0.001), np.arange(0.05, 0.099, 0.002), np.arange(0.1, 3.2, 0.005)])
-
-        dt  = h5xs(f'{masked_file}', [de.detectors, qgrid2])
-        tic = time.perf_counter()
-        print(f'Circular averaging starts now ... ')
-        dt.load_data(N=8)
-        print(f'{masked_file} total 1-d averaging time {time.perf_counter() - tic} seconds')
-
-        ## setting patch attributes on the processed folder
-        set_patch_attributes(masked_file, patches)
-
-        return masked_file
 
 
 def file_polyfit_heatmap_plot(file, indices, qgrid2):
@@ -443,3 +393,133 @@ def pdfs_merging(directory = '', output = 'result.pdf'):
         os.chdir(root_dir)
 
     print('Back to root directory ', os.getcwd())
+
+
+def patch_one_frame(img, patches):
+    """
+        dset_waxs[0] = patch_one_frame(dset_waxs[0], patches)
+    """
+    for args in patches:   
+        if type(args[1]) == int: 
+            orig, radius = args
+            ### Syntax: cv2.circle(image, center_coordinates, radius, color, thickness/(-1 = fill by the color black=0)
+            img = cv2.circle(img, tuple(orig), radius, 0, -1)
+        elif type(args[1]) == list:    
+            starting_point, ending_point = args
+            ### Syntax: cv2.rectangle(image, starting_point, ending_point, color, thickness)
+            img = cv2.rectangle(img, tuple(starting_point), tuple(ending_point), 0, -1)
+    return img
+
+def mica_patching(file, frame, patches, qgrid ):
+    """
+        mica_patching(file, frame, patches, qgrid2)
+    """
+    ## semi-specs
+    valid_range_min, valid_range_max = (0,10)
+    scattering = '_WAXS2'
+    masked_file = f'{h5_top_group(file)}_masked_{frame}.h5'
+
+    ## computation
+    with h5py.File(file,'r') as hdf:
+        dset = hdf.get(f'{masked_file.split("_masked")[0]}/primary/data')
+        dset_saxs = np.expand_dims(dset['pil1M_image'][frame], axis=0)
+        dset_waxs = np.expand_dims(dset['pilW2_image'][frame], axis=0)
+        print(f'frame information extraction completes with _SAXS shape {dset_saxs.shape} _WAXS shape {dset_waxs.shape}...')
+
+    # create temporary file
+    if os.path.isfile(masked_file):
+        os.remove(masked_file)
+    
+    # overwriting patching information
+    with h5py.File(masked_file,'w') as hdf:
+        
+        # patching for one frame
+        dset_waxs[0] = patch_one_frame(dset_waxs[0], patches)
+        
+        # save patched image
+        dset = hdf.create_group(f'/{masked_file.split("_masked")[0]}/primary/data')
+        dset.create_dataset('pil1M_image', data = dset_saxs, compression="lzf")
+        dset.create_dataset('pilW2_image', data = dset_waxs, compression="lzf")
+
+    ## Lin Yang's Code for 1-D averaging        
+    azimuthal_averaging(masked_file, qgrid, n_proc=1)
+
+    ### Plot image after patches
+    img = np.clip(dset_waxs[0], valid_range_min, valid_range_max, dtype = np.int8)
+
+    ### plot WAXS data
+    with h5py.File(masked_file,'r') as hdf:
+        dset_merged = hdf.get(f'{masked_file.split("_masked")[0]}/processed')
+        dset_merged = dset_merged[scattering][:]
+
+    f, axs = plt.subplots(1,2, figsize = (10,5), num=f'{masked_file} {scattering} data')
+    axs[0].imshow(img, cmap = 'rainbow')
+    axs[1].set_xlabel("$q (\AA^{-1})$",); 
+    axs[1].set_ylabel("$I$",);
+    axs[1].set_xscale('linear')
+    axs[1].set_yscale('linear')
+    #axs[1].errorbar(qgrid2, dset_merged[0][0], dset_merged[0][1], label=f'{scattering} {frame}')   # here dataset has only one frame
+    axs[1].plot(qgrid, dset_merged[0][0], )   # here dataset has only one frame
+    plt.show()
+
+    # delete temporary file
+    os.remove(masked_file)
+
+
+### circular averaging after patching
+def circ_avg_from_patches(source_file, qgrid, patches):
+    """
+        masked_file = circ_avg_from_patches(source_file, qgrid, patches)
+    """
+    ## specs
+    masked_file = f'{h5_top_group(source_file)}_masked.h5'
+
+    ## computation
+    if os.path.isfile(masked_file):
+        print(f'DID not PATCH {masked_file} already exists - did not copy, ')
+        print(f'1-D Averaging is NOT performed as {masked_file} already exist ')
+        print(f'TO do patching on {masked_file} delete the file first manually and run this cell again')
+
+
+    else:
+        print(f'{masked_file} is being created in {os.getcwd()} ...')
+        shutil.copy2(source_file, masked_file)       # create a new file
+        print(f'{masked_file} copy is done')
+
+        # read _WAXS2 source data, replace masked data and save masked out data on _WAXS2
+        with h5py.File(masked_file,'r+') as hdf:
+            try:
+                dset = hdf.get(f'{h5_top_group(masked_file)}')
+                del dset['processed']
+                #del dset["_SAXS"], dset["_WAXS2"], dset["merged"]
+            except:
+                pass
+
+            tic = time.perf_counter();     
+            print(f'{masked_file} Loading data into a numpy array started ')
+            dset = dset.get(f'/{h5_top_group(masked_file)}/primary/data')
+            dset_waxs = np.array(dset.get('pilW2_image'))        # np.array(dset.get('pilW2_image')), dset.get('pilW2_image')[...] 
+            del dset['pilW2_image']
+            print(f'{masked_file} Loading data into a numpy array finished in {time.perf_counter()-tic} seconds')
+
+
+            # Loop over the data to mask out the patches
+            print(f'{masked_file} Patching Started ')
+            for frame in range(len(dset_waxs)):
+                dset_waxs[frame] = patch_one_frame(dset_waxs[frame], patches)
+            print(f'{masked_file} Patching Finished')
+
+            tic = time.perf_counter();     
+            print(f'{masked_file} patched pilW2_image dataset creation staring ... ')
+            # 'lzf' (no compression_opts), chunks=(1,1043,981), compression_opts=1
+            dset.create_dataset('pilW2_image', data = dset_waxs, compression="gzip", compression_opts=1)  
+            print(f'{masked_file} patched pilW2_image dataset creation finished in {time.perf_counter()-tic} seconds')
+
+
+        ## create 1d data from lin Yang's code (py4xs packages are used here)
+        azimuthal_averaging(masked_file, qgrid, n_proc=8)
+
+        ## setting patch attributes on the processed folder
+        set_patch_attributes(masked_file, patches)
+
+        return masked_file
