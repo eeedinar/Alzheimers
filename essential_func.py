@@ -14,12 +14,15 @@ import pylab as plt
 import matplotlib.backends.backend_pdf                        # pdf generation package
 import ipywidgets 
 from PyPDF2 import PdfFileMerger
+import scipy.stats as stats
+import pandas as pd
+from mpl_toolkits.axes_grid1 import make_axes_locatable       # for show_colorbar function
 
 # Lin Yang's BNL packages for 1-d averaging
 from py4xs.hdf import h5xs,h5exp,lsh5
 from py4xs.data2d import Data2d    
 
-## create 1d data from lin Yang's code (py4xs packages are used here)
+## create 1d data from Lin Yang's code (py4xs packages are used here)
 def azimuthal_averaging(file, qgrid, n_proc=8):
     """
         azimuthal_averaging(masked_file, qgrid, n_proc=8)
@@ -76,6 +79,7 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
         method = 'circ'
     diff_patterns = find_rep_value(qgrid2, Iq, args, method = 'polyfit')
     diff_patterns = find_rep_value(qgrid2, Iq, method = 'circ')
+    return diff_patterns = (3721) 
     
     """    
     if method == 'polyfit':
@@ -175,7 +179,7 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None):
 
 
 
-def plot_heat_map_from_file(file, qgrid, scatterings = None, args = None):
+def plot_heat_map_from_file(file, qgrid, scatterings = None):
     """
         Input args:
             must be tupple scattering = ('_SAXS',)
@@ -206,13 +210,19 @@ def plot_heat_map_from_file(file, qgrid, scatterings = None, args = None):
     plt.show()
     return f
 
-def cwd_files_type_search(file_type):
+def cwd_files_search_with(seek_str, search_where = 'end'):
     """
-        files_sorted = cwd_files_type_search('.h5')
+        files_sorted = cwd_files_search_with('.h5')
     """
     files = []
-    for file in [each for each in os.listdir(os.getcwd()) if each.endswith(file_type)]:
-        files.append(file)
+    if search_where == 'end':
+        for file in [each for each in os.listdir(os.getcwd()) if each.endswith(seek_str)]:
+            files.append(file)
+    
+    elif search_where == 'start':
+        for file in [each for each in os.listdir(os.getcwd()) if each.startswith(seek_str)]:
+            files.append(file)
+
     files_sorted = sorted(files)
     return files_sorted
 
@@ -224,7 +234,7 @@ def plot_all_heat_maps_cwd(file, qgrid, scatterings):
             plot_all_heat_maps_cwd('output.pdf', qgrid2, scatterings)
     """
     pdf = matplotlib.backends.backend_pdf.PdfPages('output.pdf')
-    files_sorted = cwd_files_type_search('.h5')
+    files_sorted = cwd_files_search_with('.h5')
     for file in files_sorted:
         print(f'Loading file {file}')
         
@@ -333,7 +343,6 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
             axs[0, idx_indices].scatter(X_test[max_ind], y_test[max_ind], color = 'blue', marker='^', label = 'max point')
             axs[0, idx_indices].scatter(X_test[max_ind], np.polyval(coefs, X_test[max_ind]), color = 'orange' , marker=r'$\clubsuit$' ,label = 'ref point')
             axs[0, idx_indices].annotate("", (X_test[max_ind], y_test[max_ind]) , (X_test[max_ind], np.polyval(coefs, X_test[max_ind])), arrowprops={'arrowstyle':'<-'})
-
             axs[0, idx_indices].set(title = f'Poly_ord {poly_ord} Frame - {frame_polyfit} {comment}' ,
                         xlabel = 'X' , ylabel = 'y', xscale='linear', yscale = 'linear' )
             axs[0, idx_indices].legend()
@@ -378,7 +387,7 @@ def pdfs_merging(directory = '', output = 'result.pdf'):
     try:
         print(f'Changing to {root_dir}/{directory} directory ')
         os.chdir(f'{root_dir}/{directory}')
-        pdfs = cwd_files_type_search('.pdf')
+        pdfs = cwd_files_search_with('.pdf')
         merger = PdfFileMerger()
 
         for pdf in pdfs:
@@ -394,10 +403,35 @@ def pdfs_merging(directory = '', output = 'result.pdf'):
 
     print('Back to root directory ', os.getcwd())
 
+def show_colorbar(im,f,ax):
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    f.colorbar(im, cax=cax)
 
-def patch_one_frame(img, patches):
+def threshold_patch_one_frame(dset_waxs, args):
     """
-        dset_waxs[0] = patch_one_frame(dset_waxs[0], patches)
+        args = dset_waxs_sum, a_min, a_max, thr
+        dset_waxs_thr, gray_img, thr_fr_img = threshold_patch_one_frame(dset_waxs, args)
+    """
+    dset_waxs_sum, a_min, a_max, thr = args
+    #### thresholded pixalated sum
+    dset_waxs_thr = np.clip(dset_waxs_sum,a_min,a_max)            # image thresholding    
+
+    #### global thresholding 
+    gray_img = np.zeros_like(dset_waxs_thr);      # initialize a zero matrix like dset_waxs_thr - (gray matrix)
+    thr_cond = dset_waxs_thr>thr;                 # do thresholding
+    gray_img[thr_cond] = 0;                       # make zero/black to each elements where condition is true
+    gray_img[np.invert(thr_cond)] = 255;          # make 255/white to each elements where condition is inverted/false
+    gray_img = gray_img==255                      # thresholded image is now binary image 
+
+    #### Plot image after thresholding  
+    thr_fr_img = dset_waxs*gray_img
+
+    return dset_waxs_thr, gray_img, thr_fr_img
+
+def rec_circ_patch_one_frame(img, patches):
+    """
+        dset_waxs[0] = rec_circ_patch_one_frame(dset_waxs[0], patches)
     """
     for args in patches:   
         if type(args[1]) == int: 
@@ -410,18 +444,26 @@ def patch_one_frame(img, patches):
             img = cv2.rectangle(img, tuple(starting_point), tuple(ending_point), 0, -1)
     return img
 
-def mica_patching(file, frame, patches, qgrid ):
+def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch'):
     """
-        mica_patching(file, frame, patches, qgrid2)
+    thresholding with axes: 
+        patching(file, frame, qgrid2, args=args, axes = (f,[axs[1,0], axs[1,1]]), method = 'thresholding',)
+    Individual cell thresholding:
+        patching(file, frame.value, qgrid2, args=args, method = 'thresholding')
+    Rectangual Circular patching:
+        patching(file, frame, qgrid2, args=patches, method = 'rec_circ_patch')
+
+    return:
+        Iq_M = returns Iq values of Masked frame
     """
     ## semi-specs
-    valid_range_min, valid_range_max = (0,10)
+    valid_range_min, valid_range_max = (0,10)      # just for WAXS Display purpose
     scattering = '_WAXS2'
     masked_file = f'{h5_top_group(file)}_masked_{frame}.h5'
 
     ## computation
     with h5py.File(file,'r') as hdf:
-        dset = hdf.get(f'{masked_file.split("_masked")[0]}/primary/data')
+        dset = hdf.get(f'{h5_top_group(masked_file)}/primary/data')
         dset_saxs = np.expand_dims(dset['pil1M_image'][frame], axis=0)
         dset_waxs = np.expand_dims(dset['pilW2_image'][frame], axis=0)
         print(f'frame information extraction completes with _SAXS shape {dset_saxs.shape} _WAXS shape {dset_waxs.shape}...')
@@ -434,10 +476,15 @@ def mica_patching(file, frame, patches, qgrid ):
     with h5py.File(masked_file,'w') as hdf:
         
         # patching for one frame
-        dset_waxs[0] = patch_one_frame(dset_waxs[0], patches)
+        if method =='rec_circ_patch':
+            dset_waxs[0] = rec_circ_patch_one_frame(dset_waxs[0], args)     # here args is patches
+        elif method =='thresholding':
+            _, _, dset_waxs[0] = threshold_patch_one_frame(dset_waxs[0], args)
+        else:
+            raise Exception("something went wrong")
         
         # save patched image
-        dset = hdf.create_group(f'/{masked_file.split("_masked")[0]}/primary/data')
+        dset = hdf.create_group(f'/{h5_top_group(masked_file)}/primary/data')
         dset.create_dataset('pil1M_image', data = dset_saxs, compression="lzf")
         dset.create_dataset('pilW2_image', data = dset_waxs, compression="lzf")
 
@@ -447,29 +494,39 @@ def mica_patching(file, frame, patches, qgrid ):
     ### Plot image after patches
     img = np.clip(dset_waxs[0], valid_range_min, valid_range_max, dtype = np.int8)
 
-    ### plot WAXS data
+    ### get WAXS data after patching
     with h5py.File(masked_file,'r') as hdf:
-        dset_merged = hdf.get(f'{masked_file.split("_masked")[0]}/processed')
+        dset_merged = hdf.get(f'{h5_top_group(masked_file)}/processed')
         dset_merged = dset_merged[scattering][:]
 
-    f, axs = plt.subplots(1,2, figsize = (10,5), num=f'{masked_file} {scattering} data')
-    axs[0].imshow(img, cmap = 'rainbow')
-    axs[1].set_xlabel("$q (\AA^{-1})$",); 
-    axs[1].set_ylabel("$I$",);
-    axs[1].set_xscale('linear')
-    axs[1].set_yscale('linear')
+    ### extract axes parameter   
+    f, axs = plt.subplots(1,2, figsize = (12,6), num=f'{file}') if axes==None else axes
+    
+    im = axs[0].imshow(img, cmap = 'rainbow')     # remember each pixel value is limited by clipped value [0,10]
+    show_colorbar(im,f,axs[0])
+    axs[0].set_title(f'Frame = {frame}')
+
     #axs[1].errorbar(qgrid2, dset_merged[0][0], dset_merged[0][1], label=f'{scattering} {frame}')   # here dataset has only one frame
-    axs[1].plot(qgrid, dset_merged[0][0], )   # here dataset has only one frame
-    plt.show()
+    axs[1].plot(qgrid, dset_merged[0][0], label='after patch')   # here dataset has only one frame
+    axs[1].set(xlabel = "$q (\AA^{-1})$", ylabel = "$I$", xscale='linear', yscale = 'linear' ); 
+    axs[1].legend()
+
+    plt.suptitle(f'{file}')
+    plt.tight_layout()  #    plt.subplot_tool() 
 
     # delete temporary file
     os.remove(masked_file)
 
+    return dset_merged[0][0]
 
 ### circular averaging after patching
-def circ_avg_from_patches(source_file, qgrid, patches):
+def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch'):
     """
-        masked_file = circ_avg_from_patches(source_file, qgrid, patches)
+    rectangular/circular patch:
+        masked_file = circ_avg_from_patches(source_file, qgrid, args=patches)
+    thresholding patch:
+        args = a_min, a_max, thr   # different from previous one --> dset_waxs_sum will be calculated here
+        masked_file = circ_avg_from_patches(source_file, qgrid, args = args, method = 'thresholding')
     """
     ## specs
     masked_file = f'{h5_top_group(source_file)}_masked.h5'
@@ -504,10 +561,19 @@ def circ_avg_from_patches(source_file, qgrid, patches):
 
 
             # Loop over the data to mask out the patches
+            tic = time.perf_counter();     
             print(f'{masked_file} Patching Started ')
+            dset_waxs_sum = np.sum(dset_waxs,axis=0) if method =='thresholding' else None   # summing all the frame values for thresholding
             for frame in range(len(dset_waxs)):
-                dset_waxs[frame] = patch_one_frame(dset_waxs[frame], patches)
-            print(f'{masked_file} Patching Finished')
+                if method =='rec_circ_patch':
+                    dset_waxs[frame] = rec_circ_patch_one_frame(dset_waxs[frame], args)     # here args is patches
+                elif method =='thresholding':
+                    a_min, a_max, thr = args
+                    _, _, dset_waxs[frame] = threshold_patch_one_frame(dset_waxs[frame], (dset_waxs_sum, a_min, a_max, thr) )  # here args = (a_min, a_max, thr)
+                else:
+                    raise Exception("Patching failed")
+            print(f'{masked_file} Patching finished in {time.perf_counter()-tic} seconds')
+
 
             tic = time.perf_counter();     
             print(f'{masked_file} patched pilW2_image dataset creation staring ... ')
@@ -520,6 +586,150 @@ def circ_avg_from_patches(source_file, qgrid, patches):
         azimuthal_averaging(masked_file, qgrid, n_proc=8)
 
         ## setting patch attributes on the processed folder
-        set_patch_attributes(masked_file, patches)
+        set_patch_attributes(masked_file, args)
 
         return masked_file
+
+def BS_Intensity(file, bkg_frame):
+    """
+    returns background subtracted intensity IqBS = BS_Intensity(file='2048_B8_masked.h5', bkg_frame = 2223)
+    IqBS shape ex. (3721,690)
+    """
+    # read Iq file
+    Iq_AF = read_Iq(file, scattering='merged')
+    n_patterns, n_qgrid = Iq_AF.shape
+    Iq_BK = np.broadcast_to(Iq_AF[bkg_frame], (n_patterns, n_qgrid))          # broadcast to (3721,690)
+
+    # read transvalue
+    with h5py.File(file,'r') as hdf:
+        Iq_trans = hdf.get(f'{h5_top_group(file)}/primary/data')          # Iq = hdf.get('2048_B16/primary/data')
+        Iq_trans = np.array(Iq_trans.get('em2_sum_all_mean_value'))       # Iq = np.array(2048_B16/em2_sum_all_mean_value')
+
+    # background correction calculations
+    normalized_beam_intensity = (Iq_trans/Iq_trans[bkg_frame]).reshape(-1,1)                  # (3721,1) each frame intnsity is normalized by background intensity
+    IqBS  = Iq_AF - Iq_BK*np.broadcast_to(normalized_beam_intensity, (n_patterns,n_qgrid))      # (3721,690) - (3721,690)*(3721,690) --> normalized_beam_intensity broadcasted from (3721,1) to (3721,690)
+    
+    return IqBS
+
+def extract_line_indices(Tsplits, Tpoints, Startidx, RList=[]):
+    """
+    function call: indices = extract_line_indices(3, 109, 2)   # 3 line fits, maximum indices(excluding), starting indices
+    """
+    min_points = 2
+    if Tsplits ==2:
+        # Line1-Startidx, Line1-Startidx+increase points, Line2 Start idx =  Line1-Startidx+increase points, last point
+        return [ RList + [[Startidx, Startidx+Npoints], [Startidx+Npoints, Tpoints]] \
+                         for Npoints in range(min_points,Tpoints) \
+                             if (Tpoints- (Startidx+Npoints))>=(Tsplits-1)*min_points]  # total points - (starting idx + last point) >= min_point to make sure we can fit line
+    else:
+        return [extract_line_indices(Tsplits-1, Tpoints, Startidx+Npoints, RList=RList+[[Startidx, Startidx+Npoints]]) \
+                         for Npoints in range(min_points,Tpoints) \
+                             if (Tpoints- (Startidx+Npoints))>=(Tsplits-1)*min_points]
+
+# unequal level of list depth/nesting
+def flatten(S):
+    """
+    l = [2,[[1,2]],1]
+    list(flatten(l))
+    """
+    if S == []:
+        return S
+    if isinstance(S[0], list):
+        return flatten(S[0]) + flatten(S[1:])
+    return S[:1] + flatten(S[1:])
+
+def linear_fit(xData, yData, ):
+    """
+    function call:  slope, intercept, rsq, p_val, std_err = linear_fit(xData, yData)
+    """
+    slope, intercept, r_val, p_val, std_err = stats.linregress(xData, yData)  # slope, intercept, r_val, p_val, std_err
+    rsq = r_val**2;   # rsquare value    
+    return np.round([slope, intercept, rsq, p_val, std_err], 4)
+
+def plot_linear_lines(xData, yData, indices):
+    """
+    indices = [2,17,17,52,52,109]
+    function call:  plot_linear_lines(xData, yData, indices)
+    """
+    Nsplits = int(len(indices)/2)                                   # retriving number of splits
+    f, ax = plt.subplots(nrows=1, ncols=1, figsize=(10,5))          # plot figure                                                  
+    color = ['red', 'black', 'green', 'blue', 'brown', 'magenta','cyan','purple']   # color sets for 3 line fittings only
+
+    for i in range(0,Nsplits):
+        idx = range(indices[i*2],indices[i*2+1])    # create indices range for xData and yData
+        X  = xData[idx]            # qgrid low value
+        y  = yData[idx]            # qgrid low value
+        slope, intercept, _, _, _ = linear_fit(X, y)
+        yfit  = np.polyval([slope, intercept], X)
+
+        Rxc = np.sqrt(-slope*2)        # determine redius of cross sectional gyration
+        ax.scatter(X, y, color=color[2*i],   label = f'exp data{i+1}')                       # scatter plot
+        ax.plot(X, yfit, color=color[2*i+1], label = f'Rxc_{i+1}={Rxc:0.3f} I(0)_{i+1}={intercept:0.3f}', linewidth=3)              # polynomial fitting
+
+    ax.set(xlabel = 'Q^2' , ylabel = 'log(Iq*Q)', xscale='linear', yscale = 'linear', title = f'Rg and I(0)' )
+    ax.legend()
+
+def optimize_best_lines(IqBS, qgrid, Nsplits, LastIdx, StartIdx, print_summary=False, show_plot=False, save_csv = False,):
+    """
+        This function operates on each frame
+        df = optimize_best_lines(IqBS[frame], qgrid2, Nsplits, LastIdx, StartIdx, print_summary=True, show_plot=True)
+    """
+    # semi spces
+    IqQ = np.log(IqBS*qgrid)                            # background subtracted Iq
+    QQ  = np.square(qgrid)                                     # squaring q values
+    xData = QQ
+    yData = IqQ
+
+    # computations
+    indices = extract_line_indices(Nsplits, LastIdx, StartIdx)         # not of lines want to fit, maximum range (excluding), starting idx
+    result = np.array(flatten(indices)).reshape(-1,Nsplits*2)          # create at 2D matrix of combinations 
+    #print(result)                                                     # print total combinations matrix
+    df = pd.DataFrame(result)                                          # create dataframe for the rest of the computations 
+
+    columns = []
+    for i in range(0,Nsplits):
+        for cols in ['Tpoints-', 'qgridL-', 'qgridH-', 'slope-', 'Rxc-', 'I(0)-', 'rsq-', 'std_err-', 'std_err-']:
+            df[cols+f'{i+1}'] = np.nan
+
+    # column operations
+    for i in range(0,Nsplits):    # use tqdm(range(0,Nsplits)) if needed be
+        LL = i*2
+        HL = LL+1
+        df[f'Tpoints-{i+1}'] = df[HL] - df[LL]   # i starting from 1
+        df[f'qgridL-{i+1}']  = qgrid[df[LL]]    # qgrid low value
+        df[f'qgridH-{i+1}']  = qgrid[df[HL]]    # qgrid high value
+
+        # row operations - linear reagression plotting
+        for idx,(j,k) in enumerate(zip(df[LL].values, df[HL].values)):
+            df.loc[idx,f'slope-{i+1}'], df.loc[idx, f'I(0)-{i+1}'], df.loc[idx, f'rsq-{i+1}'], _, df.loc[idx, f'std_err-{i+1}'] = linear_fit(xData[j:k], yData[j:k], )   # slope, intercept, rsq, p_val, std_err
+            df.loc[idx,f'Rxc-{i+1}'] = np.round(np.sqrt(-df.loc[idx,f'slope-{i+1}']*2),4)
+
+    # Summing up all rsq = rsq1+ rsq2 + rsq3
+    df['rsq'] = 0; 
+    for i in range(0,Nsplits):
+        df['rsq'] += df[f'rsq-{i+1}']
+   
+    if save_csv == True:
+        df.to_csv('output.csv')                                                   # create output.csv file
+    
+    try:       #Code that may raise an error
+        np.isnan(np.sum(df.iloc[df['rsq'].idxmax()]))                                 # plotting/summary is possible if rsq doesn't have all nan values means no idxmax
+    except:    #code to run if error occurs
+        print('No best indices to plot - ending here')   
+
+    else:      #code to run if no error is raised        
+        best_indices = np.array(df.iloc[df['rsq'].idxmax()][0:Nsplits*2],dtype=int)    # find best indices for plotting 0:Nsplits*2 --> Nsplits 3 = column indices 0 1 2 3 4 5
+        
+        if print_summary == True:
+            print(f'Total Combinations = {len(result)}\n')
+            print('Summary of results Rsq -- \n',df.iloc[df['rsq'].idxmax()])         # print the location where rsq maximum
+            pd.set_option('display.max_columns',None)                                 # display all dataframe columns
+            print('More Summary of results Rsq -- \n',df[df['rsq'] > Nsplits-0.25])   # summary when Rsq > (3-0.15)=2.85
+            ax = df['rsq'].plot.hist(bins=20, title='Rsq Histogram')                   # the distribution of rsq 
+            ax.set_xlabel('rsq -->')
+
+        if show_plot == True:
+            plot_linear_lines(xData, yData, best_indices)
+
+    #print(df.head())
+    return df

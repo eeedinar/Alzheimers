@@ -9,6 +9,17 @@ Date: 01/01/2021
 
 ## import packages
 from essential_func import *
+import scipy.io as sio
+
+def save_mat(output_filename, names, values):
+    """
+        save_mat('IqBS', ('IqBS', 'qgrid2'), (IqBS, qgrid2)) --> generates IqBS.mat file with IqBS and qgrid2 variables
+    """
+    mat_contents = {}
+    for name,value in zip(names, values):
+        mat_contents[name] = value
+    sio.savemat(output_filename+'.mat', mat_contents)
+
 
 def generate_excel_file(file, qgrid, scattering, method = 'all-frames', frame= None, folder='CSV'):
     """
