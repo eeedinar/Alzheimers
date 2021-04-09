@@ -425,8 +425,9 @@ def threshold_patch_one_frame(dset_waxs, args):
     gray_img = gray_img==255                      # thresholded image is now binary image 
 
     #### Plot image after thresholding  
-    thr_fr_img = dset_waxs*gray_img
-
+    thr_fr_img = dset_waxs*gray_img               # thresholded image by the binary mask
+    thr_fr_img[thr_cond] = -1;                    # thresholded position replaced by -1
+    
     return dset_waxs_thr, gray_img, thr_fr_img
 
 def rec_circ_patch_one_frame(img, patches):
@@ -437,11 +438,11 @@ def rec_circ_patch_one_frame(img, patches):
         if type(args[1]) == int: 
             orig, radius = args
             ### Syntax: cv2.circle(image, center_coordinates, radius, color, thickness/(-1 = fill by the color black=0)
-            img = cv2.circle(img, tuple(orig), radius, 0, -1)
+            img = cv2.circle(img, tuple(orig), radius, -1, -1)
         elif type(args[1]) == list:    
             starting_point, ending_point = args
             ### Syntax: cv2.rectangle(image, starting_point, ending_point, color, thickness)
-            img = cv2.rectangle(img, tuple(starting_point), tuple(ending_point), 0, -1)
+            img = cv2.rectangle(img, tuple(starting_point), tuple(ending_point), -1, -1)
     return img
 
 def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch'):
