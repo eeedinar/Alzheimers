@@ -458,7 +458,7 @@ def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch'):
         Iq_M = returns Iq values of Masked frame
     """
     ## semi-specs
-    valid_range_min, valid_range_max = (0,10)      # just for WAXS Display purpose
+    valid_range_min, valid_range_max = (-1,10)      # just for WAXS Display purpose
     scattering = '_WAXS2'
     masked_file = f'{h5_top_group(file)}_masked_{frame}.h5'
 
