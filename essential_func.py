@@ -7,7 +7,7 @@ Date: 01/01/2021
 """
 ########################### ---------- Essential functions ---------- ###########################
 
-## import packages    
+## import packages
 import os, shutil, h5py, time, json, cv2
 import numpy as np
 import pylab as plt
@@ -36,6 +36,12 @@ def azimuthal_averaging(file, qgrid, n_proc=8):
     dt.load_data(N=n_proc)
     print(f'{file} total 1-d averaging time {time.perf_counter() - tic} seconds')
 
+### given qgrid value find index of an array
+def qgrid_to_indices(qgrid, qvalue):
+    """
+        idx = qgrid_to_indices(qgrid, qvalue)    # idx = 310 for qvalue=1.3
+    """
+    return np.argmin(qgrid < qvalue)
 
 ### valid indices search function
 def h5_top_group(file):
@@ -173,7 +179,8 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None):
     ### plotting
     f, ax = args
     ax.clear()
-    ax.imshow(img_orig, cmap = "viridis", interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal')
+    im = ax.imshow(img_orig, cmap = "viridis", interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal')
+    show_colorbar(im,f,ax)
     ax.format_coord = format_coord
     ax.set(title = title, xticks = (np.arange(0,Width,5)), yticks = (np.arange(0,Height,5)))
 
@@ -201,7 +208,7 @@ def plot_heat_map_from_file(file, qgrid, scatterings = None):
     
     for i, scattering in enumerate(scatterings):
         
-        Iq = read_Iq(file, scattering)
+        Iq = read_Iq(file, scattering)      # Iq shape (3721, 690)
         diff_patterns = find_rep_value(qgrid, Iq, method = 'circ')
         img_orig = snaking(Width, Height, diff_patterns)
         
@@ -226,15 +233,15 @@ def cwd_files_search_with(seek_str, search_where = 'end'):
     files_sorted = sorted(files)
     return files_sorted
 
-def plot_all_heat_maps_cwd(file, qgrid, scatterings):
+def plot_all_heat_maps_cwd(file, qgrid, scatterings, seek_str):
     """
         scatterings = ('_SAXS', '_WAXS2')
         
         Function call:
-            plot_all_heat_maps_cwd('output.pdf', qgrid2, scatterings)
+            plot_all_heat_maps_cwd('output.pdf', qgrid2, scatterings, seek_str='_masked.h5')
     """
     pdf = matplotlib.backends.backend_pdf.PdfPages('output.pdf')
-    files_sorted = cwd_files_search_with('.h5')
+    files_sorted = cwd_files_search_with(seek_str)
     for file in files_sorted:
         print(f'Loading file {file}')
         
@@ -260,29 +267,33 @@ def get_json_str_data(file):
     return data
 
 ### set patch attributes
-def set_patch_attributes(file, patches):
+def set_patch_attributes(file, patches, method = 'thresholding'):
     """
         set_patch_attributes(file, patches)
+        set_patch_attributes(file, patches, method = 'thresholding')
     """
     with h5py.File(file,'r+') as hdf:
         
         dset = hdf.get(f'{h5_top_group(file)}/processed')              # Iq = hdf.get('2048_B16/processed')
-        dset.attrs['patches'] = json.dumps(patches)
+        if method == 'thresholding':
+            dset.attrs['threshold'] = patches    # here patches = [amin, amax, threshold]
+        else:
+            dset.attrs['patches'] = json.dumps(patches)
 
     return "patching information written on the h5 file processed directory"
 
 ### get patch attributes
-def get_patch_attributes(file):
+def get_patch_attributes(file, method = 'thresholding'):
     """
         patches = get_patch_attributes(file)
+        patches = get_patch_attributes(file, method = 'thresholding')
     """
     with h5py.File(file,'r') as hdf:
         
         dset = hdf.get(f'{h5_top_group(file)}/processed')              # Iq = hdf.get('2048_B16/processed')
-        patches = json.loads(dset.attrs['patches'])    
+        patches = json.loads(dset.attrs['threshold']) if method == 'thresholding' else json.loads(dset.attrs['patches'])    
     
     return patches
-
 
 
 
@@ -526,7 +537,7 @@ def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch'):
     rectangular/circular patch:
         masked_file = circ_avg_from_patches(source_file, qgrid, args=patches)
     thresholding patch:
-        args = a_min, a_max, thr   # different from previous one --> dset_waxs_sum will be calculated here
+        args = a_min, a_max, thr   # args is tuple ; different from previous one --> dset_waxs_sum will be calculated here
         masked_file = circ_avg_from_patches(source_file, qgrid, args = args, method = 'thresholding')
     """
     ## specs
@@ -569,7 +580,7 @@ def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch'):
                 if method =='rec_circ_patch':
                     dset_waxs[frame] = rec_circ_patch_one_frame(dset_waxs[frame], args)     # here args is patches
                 elif method =='thresholding':
-                    a_min, a_max, thr = args
+                    a_min, a_max, thr = tuple(args)   # making sure args is tuple
                     _, _, dset_waxs[frame] = threshold_patch_one_frame(dset_waxs[frame], (dset_waxs_sum, a_min, a_max, thr) )  # here args = (a_min, a_max, thr)
                 else:
                     raise Exception("Patching failed")
@@ -587,30 +598,38 @@ def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch'):
         azimuthal_averaging(masked_file, qgrid, n_proc=8)
 
         ## setting patch attributes on the processed folder
-        set_patch_attributes(masked_file, args)
+        set_patch_attributes(masked_file, args) if method =='rec_circ_patch' else set_patch_attributes(masked_file, args, method =='thresholding')
 
         return masked_file
 
-def BS_Intensity(file, bkg_frame):
+def saxs_diff_image(file, frame, f, ax):
     """
-    returns background subtracted intensity IqBS = BS_Intensity(file='2048_B8_masked.h5', bkg_frame = 2223)
-    IqBS shape ex. (3721,690)
+        saxs_diff_image(file, frame, f, ax)
     """
-    # read Iq file
-    Iq_AF = read_Iq(file, scattering='merged')
-    n_patterns, n_qgrid = Iq_AF.shape
-    Iq_BK = np.broadcast_to(Iq_AF[bkg_frame], (n_patterns, n_qgrid))          # broadcast to (3721,690)
+    ### Read SAXS, WAXS Diffraction patterns
+    valid_range_min, valid_range_max = (-1,10)      # just for SAXS/WAXS Display purpose
 
-    # read transvalue
     with h5py.File(file,'r') as hdf:
-        Iq_trans = hdf.get(f'{h5_top_group(file)}/primary/data')          # Iq = hdf.get('2048_B16/primary/data')
-        Iq_trans = np.array(Iq_trans.get('em2_sum_all_mean_value'))       # Iq = np.array(2048_B16/em2_sum_all_mean_value')
+        dset = hdf.get(f'{h5_top_group(file)}/primary/data')
+        
+        dset_saxs = dset['pil1M_image'][frame]
+        dset_saxs = np.clip(dset_saxs, valid_range_min, valid_range_max, dtype = np.int8)
+        im = ax.imshow(dset_saxs, cmap=plt.cm.rainbow); show_colorbar(im,f,ax)
+        ax.set_title(f'SAXS Frame = {frame}', fontsize=8)
 
-    # background correction calculations
-    normalized_beam_intensity = (Iq_trans/Iq_trans[bkg_frame]).reshape(-1,1)                  # (3721,1) each frame intnsity is normalized by background intensity
-    IqBS  = Iq_AF - Iq_BK*np.broadcast_to(normalized_beam_intensity, (n_patterns,n_qgrid))      # (3721,690) - (3721,690)*(3721,690) --> normalized_beam_intensity broadcasted from (3721,1) to (3721,690)
-    
-    return IqBS
+def waxs_diff_image(file, frame, f, ax):
+    """
+        waxs_diff_image(file, frame, f, ax)
+    """    
+    ### Read SAXS, WAXS Diffraction patterns
+    valid_range_min, valid_range_max = (-1,10)      # just for SAXS/WAXS Display purpose
+
+    with h5py.File(file,'r') as hdf:      
+        dset = hdf.get(f'{h5_top_group(file)}/primary/data')
+        dset_waxs = dset['pilW2_image'][frame]
+        dset_waxs = np.clip(dset_waxs, valid_range_min, valid_range_max, dtype = np.int8)
+        im = ax.imshow(dset_waxs, cmap=plt.cm.rainbow); show_colorbar(im,f,ax)
+        ax.set_title(f'WAXS Frame = {frame}', fontsize=8)
 
 def extract_line_indices(Tsplits, Tpoints, Startidx, RList=[]):
     """
