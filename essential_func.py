@@ -112,7 +112,7 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
         diff_patterns = np.zeros(len(valid_diff_values));
         
         for frame in range(n_patterns):                      # range(100) --> look for first 100 frames
-            diff_patterns[frame] = np.mean(valid_diff_values[frame])
+            diff_patterns[frame] = np.nanmean(valid_diff_values[frame])
 
     return diff_patterns
 
