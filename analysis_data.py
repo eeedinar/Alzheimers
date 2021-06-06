@@ -9,7 +9,21 @@ Date: 04/18/2021
 
 ## import packages
 from essential_func import *
+from scipy import signal
 import mplcursors
+
+def from_clusterFr_ceffs_to_matrix(A, cluster, coeffs):
+    """
+        cluster = [2066, 2067]
+        coeffs  = [0.98, 0.99]
+        A = np.array([np.zeros((Height,Width)),sna])                  # zero values matrix (A[0]=0) with frame numbers depth (A[1]=frames)
+        
+        funciton call: A = from_clusterFr_ceffs_to_matrix(A, cluster, coeffs)
+    """
+    for i, frame in enumerate(cluster):
+        A[0][np.where(A[1]==frame)]=coeffs[i]
+        
+    return A
 
 
 class Data_Analysis():
@@ -117,8 +131,5 @@ class Data_Analysis():
         plt.suptitle(f'Frame - {self.input_fr}')
         plt.tight_layout()
         mplcursors.cursor()
-
-
-
 
 

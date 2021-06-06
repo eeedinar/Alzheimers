@@ -117,7 +117,7 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
     return diff_patterns
 
 ### snaking function
-def snaking( Width, Height, X=None,):
+def snaking(Width, Height, X=None,):
     """
         img_orig = snaking(Width, Height, diff_patterns)
     """
@@ -160,9 +160,9 @@ def read_Iq(file, scattering):
     return Iq
 
 ### generate heatmap for differnet scatterings
-def plot_heat_map_from_data(img_orig, Width, Height, args, title= None):
+def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="viridis"):
     """
-        plot_heat_map_from_data(img_orig, Width, Height, args = None, title= None)
+        plot_heat_map_from_data(img_orig, Width, Height, args = None, title= None, cmap="viridis")
     """
     ########## --------- matplotlib mouse hovering function for snaking --------- ########## 
     frame_cor = snaking(Width, Height)                  # snaking indices for heat map, 
@@ -179,7 +179,8 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None):
     ### plotting
     f, ax = args
     ax.clear()
-    im = ax.imshow(img_orig, cmap = "viridis", interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal')
+    ax.autoscale(False)
+    im = ax.imshow(img_orig, cmap = cmap, interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal')
     show_colorbar(im,f,ax)
     ax.format_coord = format_coord
     ax.set(title = title, xticks = (np.arange(0,Width,5)), yticks = (np.arange(0,Height,5)))
