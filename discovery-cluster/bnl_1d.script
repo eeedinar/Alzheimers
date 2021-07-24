@@ -1,0 +1,19 @@
+#!/bin/bash
+#SBATCH --job-name=bnl_load_data                            # Job name
+#SBATCH --nodes=1
+#SBATCH --ntasks=1               # total number of tasks across all nodes
+#SBATCH --cpus-per-task=8        # number of processes (>1 if multi-threaded tasks)
+#SBATCH --time=8:00:00                              # Time limit hrs:min:sec
+#SBATCH --mem-per-cpu=8G         # memory per cpu-core (8G per cpu-core is default)
+#SBATCH --output=exec-%j.log                   # Standard output and error log
+#SBATCH --mail-type=END,FAIL                      # Mail events (NONE, BEGIN, END, FAIL, ALL)
+#SBATCH --mail-user=bashit.a@northeastern.edu     # Where to send mail
+
+conda init bash     # To use conda env list this command modifies ~/bashrc
+source ~/.bashrc    # this will activate the base environment, which will be reflected in your shell prompt
+module load anaconda3
+conda activate /home/bashit.a/.conda/envs/py38
+
+python3 -c 'import sys; print(sys.version)'
+
+python3 bnl_1d-single.py
