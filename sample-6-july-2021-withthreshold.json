@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "name"            : "2029_EC-roi0.h5"     ,
+      "possible_plaque" : null   ,
+      "possible_bkg"    : null   ,
+      "patches"         : [
+                          ]    ,
+      "threshold"       : [0, 105532, 38600]   ,                 
+      "comments"        : "Looks good"      
+    },
+
+    {
+      "name"            : "2029_Dentate_gyrus-roi0.h5"     ,
+      "possible_plaque" : null   ,
+      "possible_bkg"    : null   ,
+      "patches"         : [
+                          ]    ,
+      "threshold"       : [0, 73376, 24800]   ,                 
+      "comments"        : "looks good"      
+    },
+
+    {
+      "name"            : "2029_Dentate_gyrus-roi1.h5"     ,
+      "possible_plaque" : null   ,
+      "possible_bkg"    : null   ,
+      "patches"         : [
+                          ]    ,
+      "threshold"       : [0, 44912, 15700]   ,                 
+      "comments"        : "I see a thin ring while masking"      
+    }
+
+  ]
+}
