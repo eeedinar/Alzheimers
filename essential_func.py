@@ -23,11 +23,11 @@ from py4xs.hdf import h5xs,h5exp,lsh5
 from py4xs.data2d import Data2d    
 
 ## create 1d data from Lin Yang's code (py4xs packages are used here)
-def azimuthal_averaging(file, qgrid, n_proc=8):
+def azimuthal_averaging(file, qgrid, n_proc=8, exp_folder = ""):
     """
         azimuthal_averaging(masked_file, qgrid, n_proc=8)
     """
-    de = h5exp("exp.h5")
+    de = h5exp(exp_folder+"exp.h5")
     qgrid2 = np.hstack([np.arange(0.005, 0.0499, 0.001), np.arange(0.05, 0.099, 0.002), np.arange(0.1, 3.2, 0.005)])
 
     dt  = h5xs(file, [de.detectors, qgrid])
@@ -35,6 +35,92 @@ def azimuthal_averaging(file, qgrid, n_proc=8):
     print(f'Circular averaging starts now ... ')
     dt.load_data(N=n_proc)
     print(f'{file} total 1-d averaging time {time.perf_counter() - tic} seconds')
+
+### read csv file to change current python directory
+def change_python_path(dropdown_name, csv_file_location, samples_csv):
+    
+    df = pd.read_csv(os.path.join(csv_file_location,samples_csv))
+    idx = df[df["dropdown-name"]==dropdown_name].index
+
+    print(f'Python directory is set to load samples from : {df["dropdown-name"][idx].values[0]}')
+    dropdown_name_list = df["dropdown-name"].values
+    os.chdir(df['bnl-scan-sample-dir'][idx].values[0])
+    exp_folder = df['corresponding-exp-dir'][idx].values[0]
+    
+    return dropdown_name_list, os.getcwd(), exp_folder
+
+## np.arange(start, stop, step) funcation but stop value is inclusive
+def drange(start, stop, step):
+    """
+        np.fromiter(drange(0, 10, 1), float)
+    """
+    i = start
+    while i<=stop:
+        yield i
+        i +=step
+
+
+### pixalated sum function
+def pixalated_sum_waxs(file, save_as_file = False, save_as_file_only = False):
+    '''
+        does not create file if it already exists, otherwise create directory (if not exist) and file
+        dset_waxs_sum = pixalated_sum_waxs(file, save_as_file=True)   --> saves file as npz
+    '''
+    
+    folder = 'pixalated_sum_waxs'
+    new_file = f'{folder}/{file.strip(".h5")}-pixalated_sum_waxs.npz'
+
+    ### if file already exists just return function
+    if save_as_file_only and os.path.isfile(new_file):
+        return
+
+
+    with h5py.File(file,'r') as hdf:
+        dset_waxs = np.array(hdf.get(f'{h5_top_group(file)}/primary/data/pilW2_image'))         # waxs data read from h5 file
+        dset_waxs_sum = np.sum(dset_waxs,axis=0)                                # summing all the frame values
+
+    dset_waxs_sum_stat = 'Pixalated Sum WAXS shape = ', dset_waxs_sum.shape , \
+              'Min. = {:02f}'.format(dset_waxs_sum.min()), \
+              'Mean = {:02f}'.format(dset_waxs_sum.mean()) , \
+              'Median = {:02f}'.format(np.median(dset_waxs_sum)) , \
+              'Max. = {:02f}'.format(dset_waxs_sum.max())
+    print(dset_waxs_sum_stat)
+    dset_waxs_sum_df = pd.DataFrame({'percentile' : np.arange(70,100) , 'value' : [np.percentile(dset_waxs_sum, i) for i in range(70,100)] })
+    dset_waxs_sum_df['value'] = dset_waxs_sum_df['value'].map("{:,.2f}".format)
+    print(dset_waxs_sum_df)
+
+
+    if save_as_file:
+                
+        if os.path.isfile(new_file):
+            print(f'DID not createe file {new_file}, already exists')
+
+        elif not os.path.exists(folder):
+            os.makedirs(folder)
+        
+        if not os.path.isfile(new_file):
+            np.savez(new_file, waxs_sum = dset_waxs_sum, waxs_sum_stat = dset_waxs_sum_stat, waxs_sum_percentile = dset_waxs_sum_df, allow_pickle=True)
+
+    return dset_waxs_sum
+
+
+# github repo to create discrete cmap https://gist.github.com/jakevdp/91077b0cae40f8f8244a
+def discrete_cmap(N, base_cmap=None):
+    """ 
+    Use of this function :
+        f = plot_heat_map_from_file(file, qgrid2, scatterings = scatterings, cmap = discrete_cmap(N=5, base_cmap = 'cubehelix'))
+    """
+    """Create an N-bin discrete colormap from the specified input map"""
+
+    # Note that if base_cmap is a string or None, you can simply do
+    #    return plt.cm.get_cmap(base_cmap, N)
+    # The following works for string, None, or a colormap instance:
+
+    base = plt.cm.get_cmap(base_cmap)
+    color_list = base(np.linspace(0, 1, N))
+    cmap_name = base.name + str(N)
+    return base.from_list(cmap_name, color_list, N)
+
 
 ### given qgrid value find index of an array
 def qgrid_to_indices(qgrid, qvalue):
@@ -52,7 +138,7 @@ def h5_top_group(file):
     """
     return file.split('_masked')[0] if file.find('_masked') >= 0 else file.split('.')[0]
 
-def valid_idx_search(qgrid, Iq):
+def valid_idx_search(qgrid, Iq, show_q = False):
     """
         Iq shape (#frames, #1-d avg. values) ex. (3721,690)
 
@@ -69,7 +155,8 @@ def valid_idx_search(qgrid, Iq):
     list_ = ~np.isnan(Iq[0,:].flatten())                      # list_ = [False, False, True, True, ...] boolean list in the first frame 
     idx_l = np.argmax(list_==True)                            # find first occurance of a boolean True ; SAXS = 2,   WAXS = 109 , merged = 0
     idx_u  = len(list_) - np.argmax(list_[::-1]==True)        # find last occurance of a invalid number;   SAXS = 125 , WAXS = 579 , merged = 690 valid on 124, 578 , 689 indices
-    print(f'low valid idx = {idx_l}, low valid Q = {qgrid[idx_l]:0.3f}, high valid idx = {idx_u-1} , high valid Q = {qgrid[idx_u-1]:0.3f}')
+    if show_q:
+        print(f'low valid idx = {idx_l}, low valid Q = {qgrid[idx_l]:0.3f}, high valid idx = {idx_u-1} , high valid Q = {qgrid[idx_u-1]:0.3f}')
     
     valid_diff_values = Iq[:, idx_l:idx_u]                 # SAXS-Iq --> (1,2:125,:3721)
     
@@ -81,16 +168,17 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
     Iq (3721,690) may contain valid or invalid values
     for polynomial averaging:
         method = 'polynomial' 
-    for circular averaging:
+    for just simply averaging:
         method = 'circ'
     diff_patterns = find_rep_value(qgrid2, Iq, args, method = 'polyfit')
     diff_patterns = find_rep_value(qgrid2, Iq, method = 'circ')
     return diff_patterns = (3721) 
     
     """    
+    n_patterns = len(Iq)
+
     if method == 'polyfit':
         poly_ord, idx_l, idx_u, limit_l, limit_u = args
-        n_patterns = len(Iq)
         diff_patterns = [];
         for frame in range(n_patterns):                      # range(100) --> look for first 100 frames
 
@@ -107,12 +195,20 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
         diff_patterns = np.array(diff_patterns)      
     
     elif method == 'circ':
-        n_patterns = len(Iq)
-        _ , _ , valid_diff_values = valid_idx_search(qgrid, Iq)
+        _ , _ , valid_diff_values = valid_idx_search(qgrid, Iq, show_q = False)
         diff_patterns = np.zeros(len(valid_diff_values));
         
         for frame in range(n_patterns):                      # range(100) --> look for first 100 frames
-            diff_patterns[frame] = np.nanmean(valid_diff_values[frame])
+            diff_patterns[frame] = np.nanmean(valid_diff_values[frame])  # calculate the mean of array ignoring the NaN value
+
+    elif method == 'point':
+        qvalue = args
+        print(f'qvalue is : {qvalue}')
+        idx = qgrid_to_indices(qgrid, qvalue=qvalue)
+        diff_patterns = np.zeros(len(Iq));
+
+        for frame in range(n_patterns):                      
+            diff_patterns[frame] = Iq[frame, idx]  # calculate the mean of array ignoring the NaN value
 
     return diff_patterns
 
@@ -139,7 +235,7 @@ def snaking(Width, Height, X=None,):
 def width_height(file):
     """
         Width, Height = width_height(file)
-    """    
+    """
     with h5py.File(file,'r') as hdf:
         dset = hdf.get(h5_top_group(file))
         header = json.loads(dset.attrs['start'])
@@ -147,24 +243,57 @@ def width_height(file):
     return Width, Height
 
 ### read Iq data from hdf file
-def read_Iq(file, scattering):
+def read_Iq(file, scattering, frame = None):
     """
         read Iq data
         Iq = read_Iq(file, scattering)
+        Iq = read_Iq(file, scattering, frame)
     """
     with h5py.File(file,'r') as hdf:
         Iq = hdf.get(f'{h5_top_group(file)}/processed')              # Iq = hdf.get('2048_B16/processed')
         Iq = np.array(Iq.get(scattering))                            # Iq = np.array(2048_B16/processed/merged')
-        Iq = Iq[:,0,:]                                               # Iq shape (3721, 690)
+        Iq = Iq[:,0,:] if frame ==None else Iq[frame,0,:]            # Iq shape (3721, 690) but if frame is given Iq shape (690,) 
 
     return Iq
+
+
+### data binning/ discritizing data and return heatmap matrix
+def discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', args = None,  data_binning=False, bins=None):
+    """
+        img_orig =  discritize_scattering(file, qgrid, scattering, data_binning=False, bins=np.fromiter(drange(0, saxs_max, saxs_inc), float) )
+    """        
+
+
+    Width, Height = width_height(file)
+
+    Iq = read_Iq(file, scattering)      # Iq shape (3721, 690)
+
+    if heatmap_rep_value == 'circ' or heatmap_rep_value == 'polyfit':
+        diff_patterns = find_rep_value(qgrid, Iq, method = heatmap_rep_value)  
+    else :
+        diff_patterns = find_rep_value(qgrid, Iq, args=args, method = heatmap_rep_value)
+    
+    # check for data binning/bucketing (returns inds on the right side of the interval it lies) - e.g. x = np.array([[5,6], [-1,0]]) ; bins = np.arange(0,5,1) ; inds = np.digitize(x, bins, right=False); print(bins,'\n' ,inds)
+    if data_binning: 
+        inds = np.digitize(diff_patterns, bins, right=False)    # right=False, right side of bin edge will be excluded
+        
+        # x    = np.array([1.2, 10.0, 12.4, 15.5, 20., -1, 5, 30]); bins = np.array([0, 5, 10, 15, 20]); inds = np.digitize(x,bins,right=False) ; inds[inds == len(bins)] = len(bins) - 1; print(bins[inds])
+        inds[inds == len(bins)] = len(bins) - 1   # inds for bins that are out of bound is being restricted to the maximum bin index (len(bins) - 1)
+        diff_patterns = bins[inds]   
+
+    else: 
+        pass
+
+    img_orig = snaking(Width, Height, diff_patterns)
+
+    return img_orig
 
 ### generate heatmap for differnet scatterings
 def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="viridis"):
     """
         plot_heat_map_from_data(img_orig, Width, Height, args = None, title= None, cmap="viridis")
     """
-    ########## --------- matplotlib mouse hovering function for snaking --------- ########## 
+    ########## --------- matplotlib mouse hovering function for snaking --------- ##########
     frame_cor = snaking(Width, Height)                  # snaking indices for heat map, 
     numrows, numcols = Height, Width                    # format_coord function requires this global variables
     def format_coord(x, y):
@@ -186,34 +315,33 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="vi
     ax.set(title = title, xticks = (np.arange(0,Width,5)), yticks = (np.arange(0,Height,5)))
 
 
-
-def plot_heat_map_from_file(file, qgrid, scatterings = None):
+### plotting heatmap from file
+def plot_heat_map_from_file(file, qgrid, scatterings = None, heatmap_rep_value = 'circ', arg_qvalue = None, cmap="viridis", args = None, data_binning=False, bins = None):
     """
         Input args:
             must be tupple scattering = ('_SAXS',)
             args = (f, axs)
-        f = plot_heat_map_from_file(file, qgrid, scatterings = scattering)
-        f = plot_heat_map_from_file(file, qgrid, scatterings = None, args = (f,axs))
+        f = plot_heat_map_from_file(file, qgrid, scatterings = scattering, cmap="viridis")
+        f = plot_heat_map_from_file(file, qgrid, scatterings = None, cmap="viridis")
+        f = plot_heat_map_from_file(file, qgrid2, scatterings = scatterings, cmap = 'viridis', args = (f,ax), data_binning=True, bins = np.array([0,10,20, 30]))
     """
     ## No given scattering argument plot all SAXS, WAXS, Merged
     if scatterings == None:
         scatterings = ('_SAXS',          '_WAXS2',        'merged'    )
     
-    f, axs = plt.subplots(1, len(scatterings), num=f'{file} Heat maps', figsize=(10,5))
+    f, axs = plt.subplots(1, len(scatterings), num=f'{file} Heat maps', figsize=(10,5)) if args == None else args
 
     if len(scatterings) == 1:   
-        axs = [axs]       # for one scatterings input making axs a list to use in the loop as axs[i]
-
+        axs =  [axs]       # for one scatterings input making axs a list to use in the loop as axs[i]
+        bins = [bins]
     ### mouse hovering function call
     Width, Height = width_height(file)
     
     for i, scattering in enumerate(scatterings):
+
+        img_orig = discritize_scattering(file, qgrid, scattering, heatmap_rep_value, arg_qvalue, data_binning, bins[i]) if heatmap_rep_value == 'point' else discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', args = None, data_binning=data_binning, bins=bins[i])
         
-        Iq = read_Iq(file, scattering)      # Iq shape (3721, 690)
-        diff_patterns = find_rep_value(qgrid, Iq, method = 'circ')
-        img_orig = snaking(Width, Height, diff_patterns)
-        
-        plot_heat_map_from_data(img_orig, Width, Height, args = (f, axs[i]), title= f'{scattering} {file}')
+        plot_heat_map_from_data(img_orig, Width, Height, args = (f, axs[i]), title= f'{scattering} {file}', cmap=cmap)
     #plt.tight_layout()
     plt.show()
     return f
@@ -415,10 +543,34 @@ def pdfs_merging(directory = '', output = 'result.pdf'):
 
     print('Back to root directory ', os.getcwd())
 
-def show_colorbar(im,f,ax):
+def show_colorbar(im,f,ax, position="right"):
     divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    f.colorbar(im, cax=cax)
+    cax = divider.append_axes(position, size="2%", pad=0.05)
+    cax.clear()
+    f.colorbar(im, cax=cax, orientation='vertical')
+
+def global_thresholding(input_array, thr, binary_inv = False):
+    """
+        gray_img, thr_cond = global_thresholding(dset_waxs_thr, thr, binary_inv = True)
+    """
+    if binary_inv:
+        #### binary inversion
+        gray_img = np.zeros_like(input_array);      # initialize a zero matrix like dset_waxs_thr - (gray matrix)
+        thr_cond = input_array>thr;                 # do thresholding (above thr it goes to zero)
+        gray_img[thr_cond] = 0;                       # make zero/black to each elements where condition is true
+        gray_img[np.invert(thr_cond)] = 255;          # make 255/white to each elements where condition is inverted/false
+        gray_img = gray_img==255                      # thresholded image is now binary image 
+
+    else:
+        #### binary only
+        gray_img = np.zeros_like(input_array);      # initialize a zero matrix like dset_waxs_thr - (gray matrix)
+        thr_cond = input_array<thr;                 # do thresholding (above thr it goes to zero)
+        gray_img[thr_cond] = 0;                       # make zero/black to each elements where condition is true
+        gray_img[np.invert(thr_cond)] = 255;          # make 255/white to each elements where condition is inverted/false
+        gray_img = gray_img==255                      # thresholded image is now binary image 
+
+    return gray_img, thr_cond
+
 
 def threshold_patch_one_frame(dset_waxs, args):
     """
@@ -430,11 +582,7 @@ def threshold_patch_one_frame(dset_waxs, args):
     dset_waxs_thr = np.clip(dset_waxs_sum,a_min,a_max)            # image thresholding    
 
     #### global thresholding 
-    gray_img = np.zeros_like(dset_waxs_thr);      # initialize a zero matrix like dset_waxs_thr - (gray matrix)
-    thr_cond = dset_waxs_thr>thr;                 # do thresholding
-    gray_img[thr_cond] = 0;                       # make zero/black to each elements where condition is true
-    gray_img[np.invert(thr_cond)] = 255;          # make 255/white to each elements where condition is inverted/false
-    gray_img = gray_img==255                      # thresholded image is now binary image 
+    gray_img, thr_cond = global_thresholding(dset_waxs_thr, thr, binary_inv=True)
 
     #### Plot image after thresholding  
     thr_fr_img = dset_waxs*gray_img               # thresholded image by the binary mask
@@ -457,11 +605,11 @@ def rec_circ_patch_one_frame(img, patches):
             img = cv2.rectangle(img, tuple(starting_point), tuple(ending_point), -1, -1)
     return img
 
-def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch'):
+def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch', exp_folder = ""):
     """
     thresholding with axes: 
         patching(file, frame, qgrid2, args=args, axes = (f,[axs[1,0], axs[1,1]]), method = 'thresholding',)
-    Individual cell thresholding:
+    Individual frame thresholding:
         patching(file, frame.value, qgrid2, args=args, method = 'thresholding')
     Rectangual Circular patching:
         patching(file, frame, qgrid2, args=patches, method = 'rec_circ_patch')
@@ -477,9 +625,9 @@ def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch'):
     ## computation
     with h5py.File(file,'r') as hdf:
         dset = hdf.get(f'{h5_top_group(masked_file)}/primary/data')
-        dset_saxs = np.expand_dims(dset['pil1M_image'][frame], axis=0)
+        dset_saxs_no_mask = np.expand_dims(dset['pil1M_image'][frame], axis=0)
         dset_waxs = np.expand_dims(dset['pilW2_image'][frame], axis=0)
-        print(f'frame information extraction completes with _SAXS shape {dset_saxs.shape} _WAXS shape {dset_waxs.shape}...')
+        print(f'frame information extraction completes with _SAXS shape {dset_saxs_no_mask.shape} _WAXS shape {dset_waxs.shape}...')
 
     # create temporary file
     if os.path.isfile(masked_file):
@@ -498,31 +646,29 @@ def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch'):
         
         # save patched image
         dset = hdf.create_group(f'/{h5_top_group(masked_file)}/primary/data')
-        dset.create_dataset('pil1M_image', data = dset_saxs, compression="lzf")
-        dset.create_dataset('pilW2_image', data = dset_waxs, compression="lzf")
+        dset.create_dataset('pil1M_image', data = dset_saxs_no_mask, compression="lzf")   # no change 
+        dset.create_dataset('pilW2_image', data = dset_waxs, compression="lzf")           # patched waxs
 
-    ## Lin Yang's Code for 1-D averaging        
-    azimuthal_averaging(masked_file, qgrid, n_proc=1)
-
-    ### Plot image after patches
-    img = np.clip(dset_waxs[0], valid_range_min, valid_range_max, dtype = np.int8)
-
-    ### get WAXS data after patching
-    with h5py.File(masked_file,'r') as hdf:
-        dset_merged = hdf.get(f'{h5_top_group(masked_file)}/processed')
-        dset_merged = dset_merged[scattering][:]
+    ### Lin Yang's Code for 1-D averaging        
+    azimuthal_averaging(masked_file, qgrid, n_proc=1, exp_folder = exp_folder)
 
     ### extract axes parameter   
     f, axs = plt.subplots(1,2, figsize = (12,6), num=f'{file}') if axes==None else axes
     
+    ### Plot image after patches
+    img = np.clip(dset_waxs[0], valid_range_min, valid_range_max, dtype = np.int8)
     im = axs[0].imshow(img, cmap = 'rainbow')     # remember each pixel value is limited by clipped value [0,10]
     show_colorbar(im,f,axs[0])
     axs[0].set_title(f'Frame = {frame}')
 
-    #axs[1].errorbar(qgrid2, dset_merged[0][0], dset_merged[0][1], label=f'{scattering} {frame}')   # here dataset has only one frame
-    axs[1].plot(qgrid, dset_merged[0][0], label='after patch')   # here dataset has only one frame
-    axs[1].set(xlabel = "$q (\AA^{-1})$", ylabel = "$I$", xscale='linear', yscale = 'linear' ); 
+    ### get WAXS data after patching
+    Iq_M = read_Iq(masked_file, scattering)[0]      # read_Iq(masked_file, scattering) shape is (1, 690) dataset has only one frame masked frame file (temorary will be deleted after)
+    Iq_S = read_Iq(file, scattering, frame)         # here dataset has only many frame - no masking file
+    axs[1].plot(qgrid, Iq_S, color='#1f77b4', label= f'No Mask - {frame}')   
+    axs[1].plot(qgrid, Iq_M, color='orange', label= f'Masked - {frame}')
+    axs[1].set(xlabel = "$q (\AA^{-1})$", ylabel = "$I$", xscale='linear', yscale = 'linear' );
     axs[1].legend()
+    ### axs[1].errorbar(qgrid2, dset_merged[0][0], dset_merged[0][1], label=f'{scattering} {frame}')   # here dataset has only one frame
 
     plt.suptitle(f'{file}')
     plt.tight_layout()  #    plt.subplot_tool() 
@@ -530,10 +676,10 @@ def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch'):
     # delete temporary file
     os.remove(masked_file)
 
-    return dset_merged[0][0]
+    return Iq_M
 
 ### circular averaging after patching
-def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch'):
+def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch', exp_folder = ""):
     """
     rectangular/circular patch:
         masked_file = circ_avg_from_patches(source_file, qgrid, args=patches)
@@ -596,7 +742,7 @@ def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch'):
 
 
         ## create 1d data from lin Yang's code (py4xs packages are used here)
-        azimuthal_averaging(masked_file, qgrid, n_proc=8)
+        azimuthal_averaging(masked_file, qgrid, n_proc=8, exp_folder = exp_folder)
 
         ## setting patch attributes on the processed folder
         set_patch_attributes(masked_file, args) if method =='rec_circ_patch' else set_patch_attributes(masked_file, args, method =='thresholding')
@@ -754,3 +900,43 @@ def optimize_best_lines(IqBS, qgrid, Nsplits, LastIdx, StartIdx, print_summary=F
 
     #print(df.head())
     return df
+
+### make lists of files for multiprocessing
+def multiprocessing_lists_of_files_list(seek_str = '.h5', category_max_size_GB = 30):
+    '''
+        multiprocessing_lists_of_files_list(seek_str = '.h5', category_max_size_GB = 30)
+    '''
+
+    files_name_by_size = sorted(cwd_files_search_with(seek_str), key= lambda x: os.stat(x).st_size, reverse=True)
+    files_size_by_size = [round(os.stat(file_name).st_size /1024/1024/1024, 2) for file_name in files_name_by_size] 
+    df = pd.DataFrame({'Name':files_name_by_size , 'Size': files_size_by_size, 'Category': '' })
+
+
+    sizes = []
+    count = 1
+    for idx, size_ in enumerate(df.Size):
+        sizes.append(size_)   # append sizes list
+        if sum(sizes) < category_max_size_GB:   
+            df['Category'][idx] = f'group-{count}'   # write category
+        else:
+            sizes = [sizes.pop(-1)]                  # sizes list updated to the last size when more than 30 GB
+            count +=1
+            df['Category'][idx] = f'group-{count}'   # more than 30GB new category 
+            
+    print(df)
+
+    processes_list = []
+    for i in range(count):
+        processes_list.append(list(df['Name'][df['Category'] == f'group-{i+1}']))
+    #print(processes_list)
+
+    return processes_list
+
+# returns list of selected colormap
+def cmap_list():
+    selected_cmap = [
+            'binary', 'gist_yarg', 'gist_gray', 'gray','winter', 'cool', 'hot', 'gist_heat', 'copper',
+            'Spectral', 'coolwarm', 'bwr', 'seismic',
+            'Accent', 'Set2', 'Set3', 'tab10', 'tab20c',
+            'brg','gist_rainbow', 'rainbow', 'jet', 'turbo','gist_ncar']
+    return selected_cmap
