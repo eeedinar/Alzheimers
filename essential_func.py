@@ -28,7 +28,6 @@ def azimuthal_averaging(file, qgrid, n_proc=8, exp_folder = ""):
         azimuthal_averaging(masked_file, qgrid, n_proc=8)
     """
     de = h5exp(exp_folder+"exp.h5")
-    qgrid2 = np.hstack([np.arange(0.005, 0.0499, 0.001), np.arange(0.05, 0.099, 0.002), np.arange(0.1, 3.2, 0.005)])
 
     dt  = h5xs(file, [de.detectors, qgrid])
     tic = time.perf_counter()
@@ -58,7 +57,6 @@ def drange(start, stop, step):
     while i<=stop:
         yield i
         i +=step
-
 
 ### pixalated sum function
 def pixalated_sum_waxs(file, save_as_file = False, save_as_file_only = False):
@@ -140,7 +138,7 @@ def h5_top_group(file):
 
 def valid_idx_search(qgrid, Iq, show_q = False):
     """
-        Iq shape (#frames, #1-d avg. values) ex. (3721,690)
+        Iq shape (#frames, #1-d avg. values) ex. (3721,690) shape must be min. (1,690)
 
         function call: 
         idx_l, idx_u, valid_diff_values = valid_idx_search(qgrid2, Iq)
@@ -203,13 +201,13 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
 
     elif method == 'point':
         qvalue = args
-        print(f'qvalue is : {qvalue}')
         idx = qgrid_to_indices(qgrid, qvalue=qvalue)
         diff_patterns = np.zeros(len(Iq));
 
         for frame in range(n_patterns):                      
             diff_patterns[frame] = Iq[frame, idx]  # calculate the mean of array ignoring the NaN value
-
+        print(f'qvalue is : {qvalue:0.4f}')
+    print(f'Minimum, Maximum Iq : {np.min(diff_patterns):0.4f}, {np.max(diff_patterns):0.4f}')
     return diff_patterns
 
 ### snaking function
@@ -232,24 +230,26 @@ def snaking(Width, Height, X=None,):
 ### snaking width_height extraction
 ## attrs in h5py is recorded in json format
 
-def width_height(file):
+def width_height(file, directory=None):
     """
         Width, Height = width_height(file)
     """
-    with h5py.File(file,'r') as hdf:
+    directory = os.getcwd() if directory == None else directory
+    with h5py.File(os.path.join(directory,file),'r') as hdf:
         dset = hdf.get(h5_top_group(file))
         header = json.loads(dset.attrs['start'])
         Height, Width = header['shape']  
     return Width, Height
 
 ### read Iq data from hdf file
-def read_Iq(file, scattering, frame = None):
+def read_Iq(file, scattering, frame = None, directory = None):
     """
         read Iq data
         Iq = read_Iq(file, scattering)
         Iq = read_Iq(file, scattering, frame)
     """
-    with h5py.File(file,'r') as hdf:
+    directory = os.getcwd() if directory == None else directory
+    with h5py.File(os.path.join(directory, file),'r') as hdf:
         Iq = hdf.get(f'{h5_top_group(file)}/processed')              # Iq = hdf.get('2048_B16/processed')
         Iq = np.array(Iq.get(scattering))                            # Iq = np.array(2048_B16/processed/merged')
         Iq = Iq[:,0,:] if frame ==None else Iq[frame,0,:]            # Iq shape (3721, 690) but if frame is given Iq shape (690,) 
@@ -258,15 +258,15 @@ def read_Iq(file, scattering, frame = None):
 
 
 ### data binning/ discritizing data and return heatmap matrix
-def discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', args = None,  data_binning=False, bins=None):
+def discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', args = None,  data_binning=False, bins=None, directory=None):
     """
         img_orig =  discritize_scattering(file, qgrid, scattering, data_binning=False, bins=np.fromiter(drange(0, saxs_max, saxs_inc), float) )
     """        
 
+    directory = os.getcwd() if directory == None else directory
+    Width, Height = width_height(file, directory)
 
-    Width, Height = width_height(file)
-
-    Iq = read_Iq(file, scattering)      # Iq shape (3721, 690)
+    Iq = read_Iq(file, scattering, directory=directory)      # Iq shape (3721, 690)
 
     if heatmap_rep_value == 'circ' or heatmap_rep_value == 'polyfit':
         diff_patterns = find_rep_value(qgrid, Iq, method = heatmap_rep_value)  
@@ -275,13 +275,12 @@ def discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', a
     
     # check for data binning/bucketing (returns inds on the right side of the interval it lies) - e.g. x = np.array([[5,6], [-1,0]]) ; bins = np.arange(0,5,1) ; inds = np.digitize(x, bins, right=False); print(bins,'\n' ,inds)
     if data_binning: 
-        inds = np.digitize(diff_patterns, bins, right=False)    # right=False, right side of bin edge will be excluded
-        
+        inds = np.digitize(diff_patterns, bins, right=False)    # right=False, right side of bin edge will be excluded        
         # x    = np.array([1.2, 10.0, 12.4, 15.5, 20., -1, 5, 30]); bins = np.array([0, 5, 10, 15, 20]); inds = np.digitize(x,bins,right=False) ; inds[inds == len(bins)] = len(bins) - 1; print(bins[inds])
         inds[inds == len(bins)] = len(bins) - 1   # inds for bins that are out of bound is being restricted to the maximum bin index (len(bins) - 1)
         diff_patterns = bins[inds]   
 
-    else: 
+    else:
         pass
 
     img_orig = snaking(Width, Height, diff_patterns)
@@ -308,11 +307,11 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="vi
     ### plotting
     f, ax = args
     ax.clear()
-    ax.autoscale(False)
+    ax.autoscale(True)
     im = ax.imshow(img_orig, cmap = cmap, interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal')
     show_colorbar(im,f,ax)
     ax.format_coord = format_coord
-    ax.set(title = title, xticks = (np.arange(0,Width,5)), yticks = (np.arange(0,Height,5)))
+    ax.set(title = title, xticks = (np.arange(0,Width,5)), yticks = (np.arange(0,Height,5))) #
 
 
 ### plotting heatmap from file
@@ -346,17 +345,18 @@ def plot_heat_map_from_file(file, qgrid, scatterings = None, heatmap_rep_value =
     plt.show()
     return f
 
-def cwd_files_search_with(seek_str, search_where = 'end'):
+def cwd_files_search_with(seek_str, search_where = 'end', directory = None):
     """
         files_sorted = cwd_files_search_with('.h5')
     """
+    directory = os.getcwd() if directory == None else directory
     files = []
     if search_where == 'end':
-        for file in [each for each in os.listdir(os.getcwd()) if each.endswith(seek_str)]:
+        for file in [each for each in os.listdir(directory) if each.endswith(seek_str)]:
             files.append(file)
     
     elif search_where == 'start':
-        for file in [each for each in os.listdir(os.getcwd()) if each.startswith(seek_str)]:
+        for file in [each for each in os.listdir(directory) if each.startswith(seek_str)]:
             files.append(file)
 
     files_sorted = sorted(files)
@@ -547,7 +547,7 @@ def show_colorbar(im,f,ax, position="right"):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes(position, size="2%", pad=0.05)
     cax.clear()
-    f.colorbar(im, cax=cax, orientation='vertical')
+    plt.colorbar(im, cax=cax, orientation='vertical')
 
 def global_thresholding(input_array, thr, binary_inv = False):
     """
