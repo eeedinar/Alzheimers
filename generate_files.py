@@ -21,13 +21,13 @@ def save_mat(output_filename, names, values):
     sio.savemat(output_filename+'.mat', mat_contents)
 
 
-def generate_excel_file(file, qgrid, scattering, method = 'all-frames', frame= None, folder='CSV'):
+def generate_excel_file(file, qgrid, scattering, method = 'all-frames', frame= None, folder='CSV', with_q=False):
     """
         file = '1943_B1a_masked.h5'
         scattering = 'merged'
         
-        generate_excel_file(file, qgrid2, scattering, method='one-frame', frame=0)
-        generate_excel_file(file, qgrid2, scattering, method='all-frames')
+        generate_excel_file(file, qgrid2, scattering, method='one-frame', frame=0, with_q=False)
+        generate_excel_file(file, qgrid2, scattering, method='all-frames', with_q=False)
     """
     
     if method == 'all-frames':
@@ -39,7 +39,8 @@ def generate_excel_file(file, qgrid, scattering, method = 'all-frames', frame= N
         print(f'{scattering} Q = , {qgrid[idx_l:idx_u]}')
         #Iq = Iq[:,0,idx_l:idx_u]                                  # Iq shape (3721, 130) skipping dI    
         Iq = Iq[:,0,:]                                            # print including nan values
-        
+        Iq = np.insert(Iq, 0, qgrid, axis=0) if with_q else Iq  # The index before which insertion is to be made - numpy.insert(arr, obj, values, axis)
+
         if not os.path.exists(folder):
             os.makedirs(folder)
         np.savetxt(f'{folder}/{file}_{scattering}.csv', Iq, delimiter=",")           # https://www.geeksforgeeks.org/convert-a-numpy-array-into-a-csv-file/

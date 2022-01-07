@@ -30,18 +30,18 @@ def from_clusterFr_ceffs_to_matrix(A, cluster, coeffs):
     for i, frame in enumerate(cluster):
         A[0][np.where(A[1]==frame)]=coeffs[i]
         
-    return A
+    B = A
+    return B
 
-def file_preprocess(file, L, qgrid, q_min=None, q_max=None, normalize=False, normalize_at_q=None):
+def file_preprocess(file, window_size, qgrid, q_min=None, q_max=None, normalize=False, normalize_at_q=None, directory = os.getcwd()):
     """ N point moving average , Normalize with a range from q_min ~ q_max
         function call: Iq = file_preprocess(file = '2048_B8_masked.h5', L=4, qgrid=qgrid2, q_min=1, q_max=2)
     """
-    # spec L = N-point moving average and Iq range for mean shift
-    b = np.ones((1,L))/L    # numerator co-effs of filter transfer function
-    a = np.ones(1)          # denominator co-effs of filter transfer function
+    # spec window_size = N-point moving average and Iq range for mean shift
+    window      = np.ones(window_size)/window_size                                    # window_size = 4 --> 0.25,0.25,0.25,0.225
 
-    Iq = read_Iq(file, 'merged')
-    Iq = signal.fftconvolve(Iq,b,mode='same',) if L>1 else Iq   # filter output using convolution
+    Iq = read_Iq(file, 'merged', directory = directory)
+    Iq = np.array([np.convolve(window, Iq[idx], mode='same') for idx in range(Iq.shape[0])  ]) if window_size>1 else Iq   # filter output using convolution
     
     Iq = Iq/np.max(Iq,axis=1).reshape(-1,1) if normalize and normalize_at_q==None else Iq      # test how normalizing affecing data points print(Iq[0][:10])
     Iq = Iq/Iq[:,qgrid_to_indices(qgrid, qvalue=normalize_at_q)].reshape(-1,1) if normalize_at_q!=None else Iq      # test how normalizing affecing data points print(Iq[0][:10])
@@ -144,7 +144,7 @@ def sort_labels(labels):
 
 class Data_Analysis():
 
-    def __init__(self, file, qgrid, directory = os.getcwd()):
+    def __init__(self, file, qgrid, window_size=4, q_min=None, q_max=None, normalize=False, normalize_at_q=None , directory = os.getcwd()):
 
         """constructor variables: 
             self.n_patterns, self.n_qgrid, self.Iq_trans, self.Iq, self.qgrid
@@ -152,7 +152,7 @@ class Data_Analysis():
         self.qgrid = qgrid
         self.file = file
         # read Iq file
-        self.Iq = read_Iq(file, scattering='merged', directory = directory)
+        self.Iq = file_preprocess(file, window_size, qgrid, q_min=None, q_max=None, normalize=False, normalize_at_q=None, directory = directory) # read_Iq(file, scattering='merged', directory = directory)
         self.n_patterns, self.n_qgrid = self.Iq.shape
 
         # read transvalue
@@ -335,7 +335,6 @@ class Data_Analysis():
             ### plot IqBS 1-D data
             axs[0,1].plot(self.qgrid, np.log(self.IqBS[self.input_fr,:].flatten()))
             axs[0,1].set_title(f'Background Subtracted 1-D {self.input_fr}', fontsize=7)
-            
 
             ### plot SAXS and WAXS images
             waxs_diff_image(self.file, self.input_fr, f=f, ax=axs[1,0])
@@ -369,7 +368,7 @@ def flatall(nested_object):
     return gather
 
 
-class snaking_frames_search:
+class Snaking_frames_search:
     def __init__(self, Width, Height):
         self.Width  = Width
         self.Height = Height

@@ -302,7 +302,7 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="vi
             z = np.flipud(frame_cor)[row, col]        # flipping to get correct value of z     
             return 'x=%1.2f, y=%1.2f, FRAME=%d' % (x, y, z)
         else:
-            return 'x=%1.2f, y=%1.2f' % (x, y)        # outside the plotting range, no need
+            return 'x=%1.2f, y=%1.2f' % (x, y)        # outside the plotting range, no need 
     
     ### plotting
     f, ax = args
