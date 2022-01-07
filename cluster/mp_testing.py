@@ -20,5 +20,3 @@ for process in processes:
 
 finish = time.perf_counter()    
 print(f'finished in {round(finish-start,2)} seconds')
-
-

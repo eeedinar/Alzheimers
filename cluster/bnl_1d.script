@@ -37,6 +37,6 @@ get_ram_info()"
 
 
 # python3 bnl_1d-single.py             # azimulthal averaging one file
-#python3 bnl_1d.py                     # azimulthal averageing all files in a folder
-python3 bnl_pixalated_sum.py          # pixalated sum for all files in a folder
-# python3 bnl_1d-single_masked.py           # threshold masking for one file
+# python3 bnl_1d-cwd.py                     # azimulthal averageing all files in a folder
+# python3 bnl_pixalated_sum.py          # pixalated sum for all files in a folder
+python3 bnl_1d-single_masked.py           # azimulthal averaging one file after masking/thresholding

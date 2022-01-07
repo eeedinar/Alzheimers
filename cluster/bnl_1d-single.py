@@ -7,8 +7,8 @@ import pylab as plt
 import os, time
 
 exp_folder = '/home/bashit.a/July-2021/'
-samples   = '/home/bashit.a/July-2021/sample-5/'
-file = "2512_EC-roi0.h5"
+samples   = '/home/bashit.a/July-2021/sample-6/'
+file = "2029_Dentate_gyrus-roi0.h5"
 
 os.chdir(samples)
 
