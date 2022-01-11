@@ -303,9 +303,20 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="vi
             return 'x=%1.2f, y=%1.2f, FRAME=%d' % (x, y, z)
         else:
             return 'x=%1.2f, y=%1.2f' % (x, y)        # outside the plotting range, no need 
+
+    def mouse_event(event):
+        x, y = event.xdata, event.ydata
+        col = int(x)                                  # truncate x values
+        row = int(y)                                  # truncate y values
+        if 0 <= col < numcols and 0 <= row < numrows:
+            z = np.flipud(frame_cor)[row, col]        # flipping to get correct value of z     
+            print('FRAME:', z)
+        else:
+            print('NO FRAME')        # outside the plotting range, no need
     
     ### plotting
     f, ax = args
+    cid = f.canvas.mpl_connect('button_press_event', mouse_event)
     ax.clear()
     ax.autoscale(True)
     im = ax.imshow(img_orig, cmap = cmap, interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal')
