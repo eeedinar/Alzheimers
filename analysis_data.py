@@ -203,9 +203,10 @@ class Data_Analysis():
         Iq_BSTF     = np.zeros_like(scaling_for)
         
         ### moving average
-        window      = np.ones(window_size)/window_size                                    # window_size = 4 --> 0.25,0.25,0.25,0.225
-        scaling_for = np.array([np.convolve(window, scaling_for[idx], 'same') for idx in range(scaling_for.shape[0])  ])             # outputs same length output and will be used for area and plotting
-        scaling_by  = np.array([np.convolve(window, scaling_by[idx],  'same')  for idx in range(scaling_by.shape[0])   ])            # outputs same length output and will be used for area and plotting
+        if window_size!=None:
+            window      = np.ones(window_size)/window_size                                    # window_size = 4 --> 0.25,0.25,0.25,0.225
+            scaling_for = np.array([np.convolve(window, scaling_for[idx], 'same') for idx in range(scaling_for.shape[0])  ])             # outputs same length output and will be used for area and plotting
+            scaling_by  = np.array([np.convolve(window, scaling_by[idx],  'same')  for idx in range(scaling_by.shape[0])   ])            # outputs same length output and will be used for area and plotting
 
 
         ### create multiplication factor search region (idx_start, idx_end)
