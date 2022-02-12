@@ -288,7 +288,7 @@ def discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', a
     return img_orig
 
 ### generate heatmap for differnet scatterings
-def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="viridis"):
+def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="viridis", norm=None, ticks=None):
     """
         plot_heat_map_from_data(img_orig, Width, Height, args = None, title= None, cmap="viridis")
     """
@@ -319,8 +319,8 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="vi
     cid = f.canvas.mpl_connect('button_press_event', mouse_event)
     ax.clear()
     ax.autoscale(True)
-    im = ax.imshow(img_orig, cmap = cmap, interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal')
-    show_colorbar(im,f,ax)
+    im = ax.imshow(img_orig, cmap = cmap, interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal', norm=None)
+    show_colorbar(im,f,ax, ticks=ticks)
     ax.format_coord = format_coord
     ax.set(title = title, xticks = (np.arange(0,Width,5)), yticks = (np.arange(0,Height,5))) #
 
@@ -554,11 +554,11 @@ def pdfs_merging(directory = '', output = 'result.pdf'):
 
     print('Back to root directory ', os.getcwd())
 
-def show_colorbar(im,f,ax, position="right"):
+def show_colorbar(im,f,ax, position="right", ticks=None):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes(position, size="2%", pad=0.05)
     cax.clear()
-    plt.colorbar(im, cax=cax, orientation='vertical')
+    plt.colorbar(im, cax=cax, orientation='vertical', ticks=ticks)
 
 def global_thresholding(input_array, thr, binary_inv = False):
     """
@@ -949,5 +949,5 @@ def cmap_list():
             'binary', 'gist_yarg', 'gist_gray', 'gray','winter', 'cool', 'hot', 'gist_heat', 'copper',
             'Spectral', 'coolwarm', 'bwr', 'seismic',
             'Accent', 'Set2', 'Set3', 'tab10', 'tab20c',
-            'brg','gist_rainbow', 'rainbow', 'jet', 'turbo','gist_ncar']
+            'brg','gist_rainbow', 'rainbow', 'jet', 'turbo','gist_ncar', 'cividis', 'viridis']
     return selected_cmap
