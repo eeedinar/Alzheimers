@@ -17,6 +17,7 @@ from PyPDF2 import PdfFileMerger
 import scipy.stats as stats
 import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable       # for show_colorbar function
+import matplotlib.image as mpimg
 
 # Lin Yang's BNL packages for 1-d averaging
 from py4xs.hdf import h5xs,h5exp,lsh5
@@ -170,6 +171,7 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
         method = 'circ'
     diff_patterns = find_rep_value(qgrid2, Iq, args, method = 'polyfit')
     diff_patterns = find_rep_value(qgrid2, Iq, method = 'circ')
+    diff_patterns = find_rep_value(qgrid2, Iq , args=1.34, method = 'point')
     return diff_patterns = (3721) 
     
     """    
@@ -347,14 +349,16 @@ def plot_heat_map_from_file(file, qgrid, scatterings = None, heatmap_rep_value =
     ### mouse hovering function call
     Width, Height = width_height(file)
     
+    img_orig = np.zeros((len(scatterings), Height, Width))
     for i, scattering in enumerate(scatterings):
 
-        img_orig = discritize_scattering(file, qgrid, scattering, heatmap_rep_value, arg_qvalue, data_binning, bins[i]) if heatmap_rep_value == 'point' else discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', args = None, data_binning=data_binning, bins=bins[i])
+        img_orig[i] = discritize_scattering(file, qgrid, scattering, heatmap_rep_value, arg_qvalue, data_binning, bins[i]) if heatmap_rep_value == 'point' else discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', args = None, data_binning=data_binning, bins=bins[i])
         
-        plot_heat_map_from_data(img_orig, Width, Height, args = (f, axs[i]), title= f'{scattering} {file}', cmap=cmap)
+        plot_heat_map_from_data(img_orig[i], Width, Height, args = (f, axs[i]), title= f'{scattering} {file}', cmap=cmap)
     #plt.tight_layout()
     plt.show()
-    return f
+
+    return f, img_orig[0] if len(scatterings)==1 else img_orig
 
 def cwd_files_search_with(seek_str, search_where = 'end', directory = None):
     """
@@ -860,6 +864,7 @@ def optimize_best_lines(IqBS, qgrid, Nsplits, LastIdx, StartIdx, print_summary=F
 
     # computations
     indices = extract_line_indices(Nsplits, LastIdx, StartIdx)         # not of lines want to fit, maximum range (excluding), starting idx
+    #print(indices)
     result = np.array(flatten(indices)).reshape(-1,Nsplits*2)          # create at 2D matrix of combinations 
     #print(result)                                                     # print total combinations matrix
     df = pd.DataFrame(result)                                          # create dataframe for the rest of the computations 
