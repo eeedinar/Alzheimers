@@ -1,0 +1,4 @@
+source .bash_profile
+
+# https://www.embl-hamburg.de/biosaxs/manuals/crysol.html
+crysol 5oqv3deg.pdb -lm 99 -fb 18 -sm 3.2 -ns 690 -dns 0.334

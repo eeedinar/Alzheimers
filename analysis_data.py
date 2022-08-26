@@ -33,10 +33,12 @@ def from_clusterFr_ceffs_to_matrix(A, cluster, coeffs):
     B = A
     return B
 
-def file_preprocess(file, window_size, qgrid, q_min=None, q_max=None, normalize=False, normalize_at_q=None, directory = os.getcwd()):
+def file_preprocess(file, window_size, qgrid, q_min=None, q_max=None, normalize=False, normalize_at_q=None, directory = None):
     """ N point moving average , Normalize with a range from q_min ~ q_max
-        function call: Iq = file_preprocess(file = '2048_B8_masked.h5', L=4, qgrid=qgrid2, q_min=1, q_max=2)
+        function call: Iq = file_preprocess(file = '2048_B8_masked.h5', window_size=4, qgrid=qgrid2, q_min=1, q_max=2)
     """
+    if directory == None:
+        directory = os.getcwd()
     # spec window_size = N-point moving average and Iq range for mean shift
     window      = np.ones(window_size)/window_size                                    # window_size = 4 --> 0.25,0.25,0.25,0.225
 
@@ -195,7 +197,6 @@ class Data_Analysis():
         self.area_minQ = area_minQ
         self.area_maxQ = area_maxQ
 
-
         ### extract scaling region intensities
         scaling_for = self.IqBS[input_fr.flatten()]   
         scaling_by  = self.IqBS[tissue_fr.flatten()]  
@@ -228,7 +229,6 @@ class Data_Analysis():
             
             Iq_P = scaling_for[idx_fr_plaque]  # plque frame q~1.55 to q~1.8
 
-
             ### calculate mf
             Iq_T_temp = []  # holding mf*Iq[tissue] (2,690) for 2 tissue frames and resets for each plaques
             for idx_fr_tissue, fr_tissue in enumerate(tissue_fr.flatten()):
@@ -245,11 +245,11 @@ class Data_Analysis():
                         mse[idx_mf] = np.mean(np.sum(np.square(Iq_P[idx_start:idx_end] - mf_temp*Iq_T[idx_start:idx_end])));   # mean square error for scaling
 
                 minIdx = mse.argmin()                                         # mf is determined by minimum MSE
-                err[fr_plaque]['MF'][fr_tissue]  = round( mf[minIdx], 6)
+                err[fr_plaque]['MF'][fr_tissue]  = round( mf[minIdx],  6)
                 err[fr_plaque]['MSE'][fr_tissue] = round(mse[minIdx], 10)
 
                 ### find area - composite trapezoidal rule in ROI - (area_minQ, area_maxQ)
-                idx_start_area, idx_end_area = qgrid_to_indices(self.qgrid, area_minQ) , qgrid_to_indices(self.qgrid, area_maxQ)        # area_minQ => (290,310) 
+                idx_start_area, idx_end_area = qgrid_to_indices(self.qgrid, area_minQ) , qgrid_to_indices(self.qgrid, area_maxQ)        # area_minQ => (290,310)
                 err[fr_plaque]['AREA'][fr_tissue] = np.trapz(y=Iq_P[idx_start_area:idx_end_area] - err[fr_plaque]['MF'][fr_tissue]*Iq_T[idx_start_area:idx_end_area], x=self.qgrid[idx_start_area:idx_end_area])
                 err[fr_plaque]['AREA'][fr_tissue] = round(err[fr_plaque]['AREA'][fr_tissue],10)  # rounding
 

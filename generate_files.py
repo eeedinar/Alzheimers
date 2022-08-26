@@ -46,7 +46,7 @@ def generate_excel_file(file, qgrid, scattering, method = 'all-frames', frame= N
         np.savetxt(f'{folder}/{file}_{scattering}.csv', Iq, delimiter=",")           # https://www.geeksforgeeks.org/convert-a-numpy-array-into-a-csv-file/
 
     elif method == 'one-frame':
-        scatterings = ('_SAXS', '_WAXS2', 'merged')
+        scatterings = ('_SAXS', '_WAXS2','merged')
         Iq_t = np.zeros((len(qgrid), 1 + len(scatterings)))
         Iq_t[:,0] = qgrid
 

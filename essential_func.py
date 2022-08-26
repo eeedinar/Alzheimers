@@ -10,7 +10,7 @@ Date: 01/01/2021
 ## import packages
 import os, shutil, h5py, time, json, cv2
 import numpy as np
-import pylab as plt
+import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf                        # pdf generation package
 import ipywidgets 
 from PyPDF2 import PdfFileMerger
