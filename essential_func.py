@@ -18,6 +18,8 @@ import scipy.stats as stats
 import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable       # for show_colorbar function
 import matplotlib.image as mpimg
+from IPython.display import display, clear_output
+from scipy.ndimage import label
 
 # Lin Yang's BNL packages for 1-d averaging
 from py4xs.hdf import h5xs,h5exp,lsh5
@@ -47,7 +49,7 @@ def change_python_path(dropdown_name, csv_file_location, samples_csv):
     os.chdir(df['bnl-scan-sample-dir'][idx].values[0])
     exp_folder = df['corresponding-exp-dir'][idx].values[0]
     
-    return dropdown_name_list, os.getcwd(), exp_folder
+    return dropdown_name, dropdown_name_list, os.getcwd(), exp_folder
 
 ## np.arange(start, stop, step) funcation but stop value is inclusive
 def drange(start, stop, step):
@@ -75,8 +77,8 @@ def pixalated_sum_waxs(file, save_as_file = False, save_as_file_only = False):
 
 
     with h5py.File(file,'r') as hdf:
-        dset_waxs = np.array(hdf.get(f'{h5_top_group(file)}/primary/data/pilW2_image'))         # waxs data read from h5 file
-        dset_waxs_sum = np.sum(dset_waxs,axis=0)                                # summing all the frame values
+        dset_waxs = np.array(hdf.get(f'{h5_top_group(file)}/primary/data/pilW2_image'))         # (4941, 1043, 981)
+        dset_waxs_sum = np.sum(dset_waxs,axis=0)                                # (1043, 981) summing over each pixel of all frames
 
     dset_waxs_sum_stat = 'Pixalated Sum WAXS shape = ', dset_waxs_sum.shape , \
               'Min. = {:02f}'.format(dset_waxs_sum.min()), \
@@ -358,6 +360,10 @@ def plot_heat_map_from_file(file, qgrid, scatterings = None, heatmap_rep_value =
     #plt.tight_layout()
     plt.show()
 
+    ### to avoild multiple plots in jupyter-lab
+    # display(f)
+    # clear_output(wait=True)
+
     return f, img_orig[0] if len(scatterings)==1 else img_orig
 
 def cwd_files_search_with(seek_str, search_where = 'end', directory = None):
@@ -411,7 +417,7 @@ def get_json_str_data(file):
     return data
 
 ### set patch attributes
-def set_patch_attributes(file, patches, method = 'thresholding'):
+def set_patch_attributes(file, args, method = 'thresholding'):
     """
         set_patch_attributes(file, patches)
         set_patch_attributes(file, patches, method = 'thresholding')
@@ -419,10 +425,17 @@ def set_patch_attributes(file, patches, method = 'thresholding'):
     with h5py.File(file,'r+') as hdf:
         
         dset = hdf.get(f'{h5_top_group(file)}/processed')              # Iq = hdf.get('2048_B16/processed')
-        if method == 'thresholding':
-            dset.attrs['threshold'] = patches    # here patches = [amin, amax, threshold]
-        else:
-            dset.attrs['patches'] = json.dumps(patches)
+        if method == 'rec_circ_patch':
+            dset.attrs['patches'] = json.dumps(args)
+        elif method == 'thresholding':
+            dset.attrs['threshold'] = args    # here args = [amin, amax, threshold]
+        elif method == 'thr_rec_circ_patch':
+
+            thr_args, patches_arg = args
+            thr_args = thr_args[1:]                  # dset_waxs_sum omitted, thr_args = [amin, amax, threshold]
+            dset.attrs['threshold'] = thr_args    # here args = [amin, amax, threshold]
+            dset.attrs['patches'] = json.dumps(patches_arg)
+
 
     return "patching information written on the h5 file processed directory"
 
@@ -435,10 +448,17 @@ def get_patch_attributes(file, method = 'thresholding'):
     with h5py.File(file,'r') as hdf:
         
         dset = hdf.get(f'{h5_top_group(file)}/processed')              # Iq = hdf.get('2048_B16/processed')
-        patches = json.loads(dset.attrs['threshold']) if method == 'thresholding' else json.loads(dset.attrs['patches'])    
+
+        if method == 'rec_circ_patch':
+            patches = json.loads(dset.attrs['patches'])    
+
+        elif method == 'thresholding':
+            patches = json.loads(dset.attrs['threshold'])  
+        
+        elif method == 'thr_rec_circ_patch':
+            patches = json.loads(dset.attrs['threshold']) , json.loads(dset.attrs['patches'])
     
     return patches
-
 
 
 def file_polyfit_heatmap_plot(file, indices, qgrid2):
@@ -455,7 +475,7 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
     """
 
     # polyfit and q value function
-    f, axs = plt.subplots(2,len(indices), figsize = (15,9), num = f'{file}')
+    f, axs = plt.subplots(2,len(indices), figsize = (16,9), num = f'{file}')
 
     def polyfit_heatmap_plot(frame_polyfit, poly_ord = 1):
 
@@ -466,8 +486,8 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
             idx_u_t = np.max(np.where(qgrid2 <= index[1]))  # 81
             idx_l =  idx_l_t - index[2]                     # 73 - 13 = 60
             idx_u =  idx_u_t + index[2]                     # 81 + 13 = 90
-            limit_l = index[2]
-            limit_u = index[2] + idx_u_t - idx_l_t
+            limit_l = index[2]                              # 13
+            limit_u = index[2] + idx_u_t - idx_l_t          # 13 + 81 -73 = 21
             scattering = index[4]
             comment = index[5]
             #print(idx_l, idx_u, limit_l, limit_u)
@@ -587,6 +607,35 @@ def global_thresholding(input_array, thr, binary_inv = False):
     return gray_img, thr_cond
 
 
+
+def loading_dset_waxs_sum(file, load_from = 'npz', show_stat=False):
+    """
+        dset_waxs_sum = loading_dset_waxs_sum(file, load_from = 'npz')
+        load_from = 'npz' # 'h5'
+    """
+    ### semi spec
+    folder = 'pixalated_sum_waxs'
+    if load_from == 'h5':
+        ##### Load file before WAXS thresholding (Requires to run the folliwing cell only) - a 300x300 roi should not take more than 3 min to load for M1 macbook
+        dset_waxs_sum = pixalated_sum_waxs(file, save_as_file=False)
+
+    elif load_from == 'npz':
+        ### load pixalated sum file (2048_B8.h5-pixalated_sum_waxs.npz) from the saved folder (pixalated_sum_waxs)
+        try:
+            arr = np.load(f'{folder}/{file.strip(".h5")}-pixalated_sum_waxs.npz', allow_pickle=True)
+            dset_waxs_sum      = arr['waxs_sum']
+            dset_waxs_sum_stat = arr['waxs_sum_stat']
+            dset_waxs_sum_df   = arr['waxs_sum_percentile']
+            if show_stat:
+                print(dset_waxs_sum_stat)
+                print(dset_waxs_sum_df)
+        except:
+            print(f'{folder}/{file}-pixalated_sum_waxs.npz file not found')
+    else:
+        print('Something Went Wrong')
+    return dset_waxs_sum
+
+
 def threshold_patch_one_frame(dset_waxs, args):
     """
         args = dset_waxs_sum, a_min, a_max, thr
@@ -620,8 +669,25 @@ def rec_circ_patch_one_frame(img, patches):
             img = cv2.rectangle(img, tuple(starting_point), tuple(ending_point), -1, -1)
     return img
 
-def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch', exp_folder = ""):
+def threshold_rec_circ_patch_one_frame(dset_waxs, args):
     """
+        args = dset_waxs_sum, a_min, a_max, thr
+        dset_waxs_thr, gray_img, thr_fr_img = threshold_patch_one_frame(dset_waxs, args)
+    """
+    threshold_args, rec_circ_patch_args   = args
+    dset_waxs_thr, gray_img, thr_fr_img = threshold_patch_one_frame(dset_waxs, threshold_args)
+
+    _, _, thr_fr_img = threshold_patch_one_frame(dset_waxs, threshold_args)
+    img = rec_circ_patch_one_frame(thr_fr_img, rec_circ_patch_args)
+
+    return img
+
+def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch', exp_folder = os.getcwd()):
+    """
+    method = 'rec_circ_patch' 
+             'thresholding'
+             'thr_rec_circ_patch'
+
     thresholding with axes: 
         patching(file, frame, qgrid2, args=args, axes = (f,[axs[1,0], axs[1,1]]), method = 'thresholding',)
     Individual frame thresholding:
@@ -647,15 +713,17 @@ def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch', exp
     # create temporary file
     if os.path.isfile(masked_file):
         os.remove(masked_file)
-    
+
     # overwriting patching information
     with h5py.File(masked_file,'w') as hdf:
-        
+
         # patching for one frame
         if method =='rec_circ_patch':
             dset_waxs[0] = rec_circ_patch_one_frame(dset_waxs[0], args)     # here args is patches
         elif method =='thresholding':
-            _, _, dset_waxs[0] = threshold_patch_one_frame(dset_waxs[0], args)
+            _, _, dset_waxs[0] = threshold_patch_one_frame(dset_waxs[0], args=args)
+        elif method =='thr_rec_circ_patch':
+            dset_waxs[0] = threshold_rec_circ_patch_one_frame(dset_waxs[0], args)
         else:
             raise Exception("something went wrong")
         
@@ -673,7 +741,7 @@ def patching(file, frame, qgrid, args, axes=None, method = 'rec_circ_patch', exp
     ### Plot image after patches
     img = np.clip(dset_waxs[0], valid_range_min, valid_range_max, dtype = np.int8)
     im = axs[0].imshow(img, cmap = 'rainbow')     # remember each pixel value is limited by clipped value [0,10]
-    show_colorbar(im,f,axs[0])
+    # show_colorbar(im,f,axs[0])
     axs[0].set_title(f'Frame = {frame}')
 
     ### get WAXS data after patching
@@ -744,6 +812,8 @@ def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch', e
                 elif method =='thresholding':
                     a_min, a_max, thr = tuple(args)   # making sure args is tuple
                     _, _, dset_waxs[frame] = threshold_patch_one_frame(dset_waxs[frame], (dset_waxs_sum, a_min, a_max, thr) )  # here args = (a_min, a_max, thr)
+                elif method =='thr_rec_circ_patch':
+                    dset_waxs[frame] = threshold_rec_circ_patch_one_frame(dset_waxs[frame], args)
                 else:
                     raise Exception("Patching failed")
             print(f'{masked_file} Patching finished in {time.perf_counter()-tic} seconds')
@@ -760,7 +830,7 @@ def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch', e
         azimuthal_averaging(masked_file, qgrid, n_proc=8, exp_folder = exp_folder)
 
         ## setting patch attributes on the processed folder
-        set_patch_attributes(masked_file, args) if method =='rec_circ_patch' else set_patch_attributes(masked_file, args, method =='thresholding')
+        # set_patch_attributes(masked_file, args, method)
 
         return masked_file
 
@@ -863,7 +933,7 @@ def optimize_best_lines(IqBS, qgrid, Nsplits, LastIdx, StartIdx, print_summary=F
     yData = IqQ
 
     # computations
-    indices = extract_line_indices(Nsplits, LastIdx, StartIdx)         # not of lines want to fit, maximum range (excluding), starting idx
+    indices = extract_line_indices(Nsplits, LastIdx, StartIdx)         # no of lines want to fit, maximum range (excluding), starting idx
     #print(indices)
     result = np.array(flatten(indices)).reshape(-1,Nsplits*2)          # create at 2D matrix of combinations 
     #print(result)                                                     # print total combinations matrix

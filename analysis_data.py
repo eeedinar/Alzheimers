@@ -15,7 +15,6 @@ from matplotlib.animation import FuncAnimation
 from IPython.display import display
 from IPython.display import HTML
 import mplcursors
-from scipy.ndimage import label
 import cv2
 
 # assign snaking heapmap A to labels
@@ -172,7 +171,6 @@ class Data_Analysis():
         if bkg_frame!=None:
             self.bkg_frame = np.array([bkg_frame])
             n_bkg_frame = len(self.bkg_frame.flatten())   # [6000,6001] - 2 frames
-            n_qgrid = self.Iq.shape[1]   # 690
 
             Iq_bkgs = self.Iq[ self.bkg_frame.flatten() ]                       # data.Iq[ bkg_frame.flatten() ].shape --> (2, 690)
 
@@ -193,22 +191,21 @@ class Data_Analysis():
         
         ### will be used for plotting
         self.input_fr  = input_fr
-        self.tissue_fr = tissue_fr
+        self.tissue_fr = np.array([tissue_fr])
         self.area_minQ = area_minQ
         self.area_maxQ = area_maxQ
 
         ### extract scaling region intensities
-        scaling_for = self.IqBS[input_fr.flatten()]   
-        scaling_by  = self.IqBS[tissue_fr.flatten()]  
-        Iq_BSTS     = np.zeros_like(scaling_for)
-        Iq_BSTF     = np.zeros_like(scaling_for)
+        self.scaling_for = self.IqBS[input_fr.flatten()]   
+        self.scaling_by  = self.IqBS[tissue_fr.flatten()]  
+        Iq_BSTS     = np.zeros_like(self.scaling_for)
+        Iq_BSTF     = np.zeros_like(self.scaling_for)
         
         ### moving average
         if window_size!=None:
             window      = np.ones(window_size)/window_size                                    # window_size = 4 --> 0.25,0.25,0.25,0.225
-            scaling_for = np.array([np.convolve(window, scaling_for[idx], 'same') for idx in range(scaling_for.shape[0])  ])             # outputs same length output and will be used for area and plotting
-            scaling_by  = np.array([np.convolve(window, scaling_by[idx],  'same')  for idx in range(scaling_by.shape[0])   ])            # outputs same length output and will be used for area and plotting
-
+            self.scaling_for = np.array([np.convolve(window, self.scaling_for[idx], 'same') for idx in range(self.scaling_for.shape[0])  ])             # outputs same length output and will be used for area and plotting
+            self.scaling_by  = np.array([np.convolve(window, self.scaling_by[idx],  'same')  for idx in range(self.scaling_by.shape[0])   ])            # outputs same length output and will be used for area and plotting
 
         ### create multiplication factor search region (idx_start, idx_end)
         idx_start, idx_end = qgrid_to_indices(self.qgrid, QSearchStart) , qgrid_to_indices(self.qgrid, QSearchEnd)      # mf_Qindices --> scaling qgrid regions indices
@@ -227,7 +224,7 @@ class Data_Analysis():
             err[fr_plaque]['MSE'] = {}
             err[fr_plaque]['AREA'] = {}
             
-            Iq_P = scaling_for[idx_fr_plaque]  # plque frame q~1.55 to q~1.8
+            Iq_P = self.scaling_for[idx_fr_plaque]  # plque frame q~1.55 to q~1.8
 
             ### calculate mf
             Iq_T_temp = []  # holding mf*Iq[tissue] (2,690) for 2 tissue frames and resets for each plaques
@@ -237,7 +234,7 @@ class Data_Analysis():
                 mf  = np.full(len(mul_factor), np.nan)         # temporary variable
                 mse = np.full(len(mul_factor), np.nan)         # temporary variable
 
-                Iq_T  = scaling_by[idx_fr_tissue]  # tissue frame q~1.55 to q~1.8
+                Iq_T  = self.scaling_by[idx_fr_tissue]  # tissue frame q~1.55 to q~1.8
                 
                 for idx_mf, mf_temp in enumerate(mul_factor):
                     mf[idx_mf] = mf_temp
@@ -264,8 +261,8 @@ class Data_Analysis():
                     if show_result:
                         print('>> plaque-fr :', fr_plaque, ' << Tissue Subtraction only counts >>',  ' background-fr :' , fr_tissue,  'MF = ' , err[fr_plaque]['MF'][fr_tissue])
             
-            Iq_BSTF[idx_fr_plaque] = np.mean(np.array(Iq_T_temp), axis=0)     
-            Iq_BSTS[idx_fr_plaque] = Iq_P - Iq_BSTF[idx_fr_plaque]
+            Iq_BSTF[idx_fr_plaque] = np.mean(np.array(Iq_T_temp), axis=0)     # background subtracted tissue frames intensity average
+            Iq_BSTS[idx_fr_plaque] = Iq_P - Iq_BSTF[idx_fr_plaque]            # background subtracted intensity minus background subtracted tissue subtracted intensities
 
         if return_alg == 'one_tissue-fr':
             return err[fr_plaque]['MF'][fr_tissue], err[fr_plaque]['AREA'][fr_tissue], Iq_BSTF, Iq_BSTS
@@ -328,18 +325,6 @@ class Data_Analysis():
 
         idx_start, idx_end = qgrid_to_indices(self.qgrid, plot_minQ) , qgrid_to_indices(self.qgrid, plot_maxQ)        # plot_Q => (290,310)
 
-        if ax==None:
-
-            f,axs = plt.subplots(nrows=2, ncols=2, num=self.input_fr, figsize=(12,7))
-            ax = axs[0,0]
-
-            ### plot IqBS 1-D data
-            axs[0,1].plot(self.qgrid, np.log(self.IqBS[self.input_fr,:].flatten()))
-            axs[0,1].set_title(f'Background Subtracted 1-D {self.input_fr}', fontsize=7)
-
-            ### plot SAXS and WAXS images
-            waxs_diff_image(self.file, self.input_fr, f=f, ax=axs[1,0])
-            saxs_diff_image(self.file, self.input_fr, f=f, ax=axs[1,1])
 
         ax.plot(self.qgrid[idx_start:idx_end], self.scaling_for[idx_start:idx_end] - self.mf*self.scaling_by[idx_start:idx_end], \
             label='Fr(' + str(self.input_fr) + ') - Fr(' + str(self.bkg_frame) + ") - " + str(round(self.mf,2)) + "*(" + 'Fr(' +str(self.tissue_fr) + ') - Fr(' + str(self.bkg_frame) + "))")
@@ -368,12 +353,12 @@ def flatall(nested_object):
             gather.append(item)
     return gather
 
-
 class Snaking_frames_search:
     def __init__(self, Width, Height):
         self.Width  = Width
         self.Height = Height
-        self.sna = snaking(Width, Height , np.arange(0, Width*Height))
+        self.sna = snaking(Width, Height , np.arange(0, Width*Height))  #   [  62,   63,   64, ...,  121,  122,  123],
+                                                                        #   [  61,   60,   59, ...,    2,    1,    0]])
         # print(self.sna)
 
         grid = np.zeros((Height,Width),dtype=object)
@@ -381,12 +366,11 @@ class Snaking_frames_search:
         for i in range(0,Height):
             for j in range(0,Width):
                 grid[i,j]=(i,j)
-        self.grid = grid[::-1]
-        # print(self.grid)
-
+        self.grid = grid[::-1]      # [(1, 0), (1, 1), (1, 2), ..., (1, 59), (1, 60), (1, 61)],
+                                    # [(0, 0), (0, 1), (0, 2), ..., (0, 59), (0, 60), (0, 61)]],
 
     def frame_to_idx(self,frame):
-        idx = [i for i in self.grid[self.sna==frame]]
+        idx = [i for i in self.grid[self.sna==frame]]   #  [i for i in fr_idx.grid[fr_idx.sna==1]] ==> [(0, 60)]
         return idx
 
     def idx_to_frame(self,l):
@@ -398,6 +382,9 @@ class Snaking_frames_search:
         return flatall(idx)
 
     def frame_idx_to_kernal_frames(self, kernal_size, frame):
+
+        ### fr_idx.frame_idx_to_kernal_frames(3,0) ==> [1, 0, 122, 123]
+
         kernel_indices = []
         kernal_inc = int(np.floor(kernal_size/2))
         frame_idx = self.frame_to_idx(frame)
@@ -406,6 +393,5 @@ class Snaking_frames_search:
             for j in np.arange(y-kernal_inc,y+kernal_inc+1):
                 if (i,j) ==(x,y) or (i>=0 and j>=0 and i<self.Height and j <self.Width):
                     kernel_indices.append((i,j))
-                    # print((i,j))
 
         return self.idx_to_frame(kernel_indices)
