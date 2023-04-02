@@ -428,12 +428,12 @@ def set_patch_attributes(file, args, method = 'thresholding'):
         if method == 'rec_circ_patch':
             dset.attrs['patches'] = json.dumps(args)
         elif method == 'thresholding':
-            dset.attrs['threshold'] = args    # here args = [amin, amax, threshold]
+            dset.attrs['threshold'] = json.dumps(args)    # here args = [amin, amax, threshold]
         elif method == 'thr_rec_circ_patch':
 
             thr_args, patches_arg = args
             thr_args = thr_args[1:]                  # dset_waxs_sum omitted, thr_args = [amin, amax, threshold]
-            dset.attrs['threshold'] = thr_args    # here args = [amin, amax, threshold]
+            dset.attrs['threshold'] = json.dumps(thr_args)    # here args = [amin, amax, threshold]
             dset.attrs['patches'] = json.dumps(patches_arg)
 
 
@@ -830,7 +830,7 @@ def circ_avg_from_patches(source_file, qgrid, args, method = 'rec_circ_patch', e
         azimuthal_averaging(masked_file, qgrid, n_proc=8, exp_folder = exp_folder)
 
         ## setting patch attributes on the processed folder
-        # set_patch_attributes(masked_file, args, method)
+        set_patch_attributes(masked_file, args, method)
 
         return masked_file
 
