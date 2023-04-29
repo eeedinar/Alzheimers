@@ -21,7 +21,7 @@ def save_mat(output_filename, names, values):
     sio.savemat(output_filename+'.mat', mat_contents)
 
 
-def generate_excel_file(file, qgrid, scattering, method = 'all-frames', frame= None, folder='CSV', with_q=False):
+def generate_excel_file(file, qgrid, scattering, method = 'all-frames', frame= None, folder='CSV', with_q=False, window_size=0):
     """
         file = '1943_B1a_masked.h5'
         scattering = 'merged'
@@ -39,6 +39,10 @@ def generate_excel_file(file, qgrid, scattering, method = 'all-frames', frame= N
         print(f'{scattering} Q = , {qgrid[idx_l:idx_u]}')
         #Iq = Iq[:,0,idx_l:idx_u]                                  # Iq shape (3721, 130) skipping dI    
         Iq = Iq[:,0,:]                                            # print including nan values
+        if window_size>1:
+            window = np.ones(window_size)/window_size                                    # window_size = 4 --> 0.25,0.25,0.25,0.225
+            Iq = np.array([np.convolve(window, Iq[idx], mode='same') for idx in range(Iq.shape[0])  ])  # filter output using convolution
+
         Iq = np.insert(Iq, 0, qgrid, axis=0) if with_q else Iq  # The index before which insertion is to be made - numpy.insert(arr, obj, values, axis)
 
         if not os.path.exists(folder):

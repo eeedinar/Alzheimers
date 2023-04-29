@@ -223,12 +223,10 @@ def snaking(Width, Height, X=None,):
         X_coor = np.arange(Height*Width).reshape(Height,Width)
     else:
         X_coor = X.reshape(Height,Width)            # input id numpy reshaped as height * width
-    img_orig = np.zeros_like(X_coor)                  # 
-    temp = np.flipud(X_coor)                        # flipud matrix
-    idx_odd = np.arange(1,Height,2)                 # Get odd indices to fliplr
-    img_orig[idx_odd,:]  = np.fliplr(temp[idx_odd])   # flipping odd indices
-    idx_even = np.arange(0,Height,2)                # Get odd indices to leave to as it is
-    img_orig[idx_even,:] = temp[idx_even]             # leaving as it is
+
+    img_orig = np.flipud(X_coor)                                     # flipud matrix
+    idx_even = np.arange(Height-2,-1,-2)                             # Get odd indices to leave to as it is
+    img_orig[idx_even,:] = np.fliplr(img_orig[idx_even])             # flipping left to right 
     return img_orig
 
 ### snaking width_height extraction
@@ -303,27 +301,27 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="vi
         col = int(x)                                  # truncate x values
         row = int(y)                                  # truncate y values
         if 0 <= col < numcols and 0 <= row < numrows:
-            z = np.flipud(frame_cor)[row, col]        # flipping to get correct value of z     
+            z = np.flipud(frame_cor)[row, col]        # flipping to get correct value of z
             return 'x=%1.2f, y=%1.2f, FRAME=%d' % (x, y, z)
         else:
-            return 'x=%1.2f, y=%1.2f' % (x, y)        # outside the plotting range, no need 
+            return 'x=%1.2f, y=%1.2f' % (x, y)        # outside the plotting range, no need
 
-    def mouse_event(event):
-        x, y = event.xdata, event.ydata
-        col = int(x)                                  # truncate x values
-        row = int(y)                                  # truncate y values
-        if 0 <= col < numcols and 0 <= row < numrows:
-            z = np.flipud(frame_cor)[row, col]        # flipping to get correct value of z     
-            print('FRAME:', z)
-        else:
-            print('NO FRAME')        # outside the plotting range, no need
+    # def mouse_event(event):
+    #     x, y = event.xdata, event.ydata
+    #     col = int(x)                                  # truncate x values
+    #     row = int(y)                                  # truncate y values
+    #     if 0 <= col < numcols and 0 <= row < numrows:
+    #         z = np.flipud(frame_cor)[row, col]        # flipping to get correct value of z     
+    #         print('FRAME:', z)
+    #     else:
+    #         print('NO FRAME')        # outside the plotting range, no need
     
-    ### plotting
+    # ### plotting
     f, ax = args
-    cid = f.canvas.mpl_connect('button_press_event', mouse_event)
+    # cid   = f.canvas.mpl_connect('button_press_event', mouse_event)
     ax.clear()
     ax.autoscale(True)
-    im = ax.imshow(img_orig, cmap = cmap, interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal', norm=None)
+    im    = ax.imshow(img_orig, cmap = cmap, interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal', norm=None)
     show_colorbar(im,f,ax, ticks=ticks)
     ax.format_coord = format_coord
     ax.set(title = title, xticks = (np.arange(0,Width,5)), yticks = (np.arange(0,Height,5))) #
@@ -622,15 +620,17 @@ def loading_dset_waxs_sum(file, load_from = 'npz', show_stat=False):
     elif load_from == 'npz':
         ### load pixalated sum file (2048_B8.h5-pixalated_sum_waxs.npz) from the saved folder (pixalated_sum_waxs)
         try:
+            print(file)
             arr = np.load(f'{folder}/{file.strip(".h5")}-pixalated_sum_waxs.npz', allow_pickle=True)
             dset_waxs_sum      = arr['waxs_sum']
+            print('dset_waxs_sum was successful')
             dset_waxs_sum_stat = arr['waxs_sum_stat']
             dset_waxs_sum_df   = arr['waxs_sum_percentile']
             if show_stat:
                 print(dset_waxs_sum_stat)
                 print(dset_waxs_sum_df)
         except:
-            print(f'{folder}/{file}-pixalated_sum_waxs.npz file not found')
+            print(f'{folder}/{file.strip(".h5")}-pixalated_sum_waxs.npz file not found')
     else:
         print('Something Went Wrong')
     return dset_waxs_sum
@@ -1026,3 +1026,17 @@ def cmap_list():
             'Accent', 'Set2', 'Set3', 'tab10', 'tab20c',
             'brg','gist_rainbow', 'rainbow', 'jet', 'turbo','gist_ncar', 'cividis', 'viridis']
     return selected_cmap
+
+
+### func to interpolate Iq values
+def interpolate_missing(A):
+    # indx, A = interpolate_missing(Iq_M_WAXS[1])
+
+    # https://stackoverflow.com/questions/6518811/interpolate-nan-values-in-a-numpy-array
+    ok = ~ np.isnan(A)
+    xp = ok.ravel().nonzero()[0]
+    fp = A[~ np.isnan(A)]
+    x  = np.isnan(A).ravel().nonzero()[0]
+    A[np.isnan(A)] = np.interp(x, xp, fp)
+
+    return x, A
