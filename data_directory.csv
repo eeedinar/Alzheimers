@@ -1,13 +1,13 @@
 dropdown-name,bnl-scan-sample-dir,corresponding-exp-dir
-July-2021-Sample#1,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/sample-1/,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/
-July-2021-Sample#2,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/sample-2/,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/
-July-2021-Sample#3,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/sample-3/,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/
-July-2021-Sample#4,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/sample-4/,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/
-July-2021-Sample#5,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/sample-5/,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/
-July-2021-Sample#6,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/sample-6/,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/
-July-2021-Sample#7,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/sample-7/,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/
-July-2021-Sample#8,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/sample-8/,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/
-July-2021-Sample#9,/Volumes/HDD/BNL-Data/July-2021-RAW/sample-9/,/Users/bashit.a/Documents/Alzheimer/July-2021/BNL-Data/
+July-2021-Sample#1,/Volumes/HDD/BNL-Data/July-2021/sample-1/,/Volumes/HDD/BNL-Data/July-2021/
+July-2021-Sample#2,/Volumes/HDD/BNL-Data/July-2021/sample-2/,/Volumes/HDD/BNL-Data/July-2021/
+July-2021-Sample#3,/Volumes/HDD/BNL-Data/July-2021/sample-3/,/Volumes/HDD/BNL-Data/July-2021/
+July-2021-Sample#4,/Volumes/HDD/BNL-Data/July-2021/sample-4/,/Volumes/HDD/BNL-Data/July-2021/
+July-2021-Sample#5,/Volumes/HDD/BNL-Data/July-2021/sample-5/,/Volumes/HDD/BNL-Data/July-2021/
+July-2021-Sample#6,/Volumes/HDD/BNL-Data/July-2021/sample-6/,/Volumes/HDD/BNL-Data/July-2021/
+July-2021-Sample#7,/Volumes/HDD/BNL-Data/July-2021/sample-7/,/Volumes/HDD/BNL-Data/July-2021/
+July-2021-Sample#8,/Volumes/HDD/BNL-Data/July-2021/sample-8/,/Volumes/HDD/BNL-Data/July-2021/
+July-2021-Sample#9,/Volumes/HDD/BNL-Data/July-2021/sample-9/,/Volumes/HDD/BNL-Data/July-2021/
 Oct-2022-1971,/Volumes/HDD/BNL-Data/Oct-2022/1971,/Volumes/HDD/BNL-Data/Oct-2022/
 Oct-2022-2068,/Volumes/HDD/BNL-Data/Oct-2022/2068,/Volumes/HDD/BNL-Data/Oct-2022/
 Oct-2022-1968,/Volumes/HDD/BNL-Data/Oct-2022/1968,/Volumes/HDD/BNL-Data/Oct-2022/
@@ -24,3 +24,4 @@ Mar-2023-Sample#1968,/Volumes/HDD/BNL-Data/Mar-2023/1968/,/Volumes/HDD/BNL-Data/
 Mar-2023-Sample#2191,/Volumes/HDD/BNL-Data/Mar-2023/2191/,/Volumes/HDD/BNL-Data/Mar-2023/
 Mar-2023-Sample#2068,/Volumes/HDD/BNL-Data/Mar-2023/2068/,/Volumes/HDD/BNL-Data/Mar-2023/
 Mar-2023-Misc,/Volumes/HDD/BNL-Data/Mar-2023/Misc/,/Volumes/HDD/BNL-Data/Mar-2023/
+Test,/Users/bashit.a/Documents/Alzheimer/Mar-2023,/Users/bashit.a/Documents/Alzheimer/Mar-2023

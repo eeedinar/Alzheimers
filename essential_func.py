@@ -38,9 +38,19 @@ def azimuthal_averaging(file, qgrid, n_proc=8, exp_folder = ""):
     dt.load_data(N=n_proc)
     print(f'{file} total 1-d averaging time {time.perf_counter() - tic} seconds')
 
+
+### dropdown name to directory
+def dropdown_to_abs_dir(dropdown_name, csv_file_location, samples_csv):
+    ## 'Mar-2023-Sample#1971' --> '/Volumes/HDD/BNL-Data/Mar-2023/1971/'
+    df = pd.read_csv(os.path.join(csv_file_location,samples_csv))
+    idx = df[df["dropdown-name"]==dropdown_name].index
+    return df['bnl-scan-sample-dir'][idx].values[0]
+
+
 ### read csv file to change current python directory
 def change_python_path(dropdown_name, csv_file_location, samples_csv):
     
+
     df = pd.read_csv(os.path.join(csv_file_location,samples_csv))
     idx = df[df["dropdown-name"]==dropdown_name].index
 
@@ -48,7 +58,7 @@ def change_python_path(dropdown_name, csv_file_location, samples_csv):
     dropdown_name_list = df["dropdown-name"].values
     os.chdir(df['bnl-scan-sample-dir'][idx].values[0])
     exp_folder = df['corresponding-exp-dir'][idx].values[0]
-    
+
     return dropdown_name, dropdown_name_list, os.getcwd(), exp_folder
 
 ## np.arange(start, stop, step) funcation but stop value is inclusive
