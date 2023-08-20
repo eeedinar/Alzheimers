@@ -8,7 +8,7 @@ Date: 01/01/2021
 ########################### ---------- Essential functions ---------- ###########################
 
 ## import packages
-import os, shutil, h5py, time, json, cv2
+import os, shutil, h5py, time, json, cv2, copy
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf                        # pdf generation package
@@ -184,9 +184,9 @@ def find_rep_value(qgrid, Iq, args=None, method = 'polyfit'):
     diff_patterns = find_rep_value(qgrid2, Iq, args, method = 'polyfit')
     diff_patterns = find_rep_value(qgrid2, Iq, method = 'circ')
     diff_patterns = find_rep_value(qgrid2, Iq , args=1.34, method = 'point')
-    return diff_patterns = (3721) 
+    return diff_patterns = (3721)
     
-    """    
+    """
     n_patterns = len(Iq)
 
     if method == 'polyfit':
@@ -229,6 +229,7 @@ def snaking(Width, Height, X=None,):
     """
         img_orig = snaking(Width, Height, diff_patterns)
     """
+    X = copy.deepcopy(X)    # deep copy
     if X is None:
         X_coor = np.arange(Height*Width).reshape(Height,Width)
     else:
@@ -250,7 +251,7 @@ def width_height(file, directory=None):
     with h5py.File(os.path.join(directory,file),'r') as hdf:
         dset = hdf.get(h5_top_group(file))
         header = json.loads(dset.attrs['start'])
-        Height, Width = header['shape']  
+        Height, Width = header['shape']
     return Width, Height
 
 ### read Iq data from hdf file
@@ -300,7 +301,7 @@ def discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', a
     return img_orig
 
 ### generate heatmap for differnet scatterings
-def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="viridis", norm=None, ticks=None):
+def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="viridis", norm=None, ticks=None, alpha=None):
     """
         plot_heat_map_from_data(img_orig, Width, Height, args = None, title= None, cmap="viridis")
     """
@@ -331,14 +332,14 @@ def plot_heat_map_from_data(img_orig, Width, Height, args, title= None, cmap="vi
     # cid   = f.canvas.mpl_connect('button_press_event', mouse_event)
     ax.clear()
     ax.autoscale(True)
-    im    = ax.imshow(img_orig, cmap = cmap, interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal', norm=None)
+    im    = ax.imshow(img_orig, cmap = cmap, interpolation = 'none', origin='upper', extent=[0,Width,0,Height], aspect='equal', norm=None, alpha=alpha)
     show_colorbar(im,f,ax, ticks=ticks)
     ax.format_coord = format_coord
     ax.set(title = title, xticks = (np.arange(0,Width,5)), yticks = (np.arange(0,Height,5))) #
 
 
 ### plotting heatmap from file
-def plot_heat_map_from_file(file, qgrid, scatterings = None, heatmap_rep_value = 'circ', arg_qvalue = None, cmap="viridis", args = None, data_binning=False, bins = None):
+def plot_heat_map_from_file(file, qgrid, scatterings = None, heatmap_rep_value = 'circ', arg_qvalue = None, cmap="viridis", args = None, data_binning=False, bins = None, alpha=None):
     """
         Input args:
             must be tupple scattering = ('_SAXS',)
@@ -364,9 +365,10 @@ def plot_heat_map_from_file(file, qgrid, scatterings = None, heatmap_rep_value =
 
         img_orig[i] = discritize_scattering(file, qgrid, scattering, heatmap_rep_value, arg_qvalue, data_binning, bins[i]) if heatmap_rep_value == 'point' else discritize_scattering(file, qgrid, scattering, heatmap_rep_value = 'circ', args = None, data_binning=data_binning, bins=bins[i])
         
-        plot_heat_map_from_data(img_orig[i], Width, Height, args = (f, axs[i]), title= f'{scattering} {file}', cmap=cmap)
+        plot_heat_map_from_data(img_orig[i], Width, Height, args = (f, axs[i]), title= f'{scattering} {file}', cmap=cmap, alpha=alpha)
     #plt.tight_layout()
-    plt.show()
+    
+    # plt.show()
 
     ### to avoild multiple plots in jupyter-lab
     # display(f)
@@ -379,17 +381,20 @@ def cwd_files_search_with(seek_str, search_where = 'end', directory = None):
         files_sorted = cwd_files_search_with('.h5')
     """
     directory = os.getcwd() if directory == None else directory
-    files = []
-    if search_where == 'end':
-        for file in [each for each in os.listdir(directory) if each.endswith(seek_str)]:
-            files.append(file)
-    
-    elif search_where == 'start':
-        for file in [each for each in os.listdir(directory) if each.startswith(seek_str)]:
-            files.append(file)
+    if os.path.isdir(directory):
+        files = []
+        if search_where == 'end':
+            for file in [each for each in os.listdir(directory) if each.endswith(seek_str)]:
+                files.append(file)
+        
+        elif search_where == 'start':
+            for file in [each for each in os.listdir(directory) if each.startswith(seek_str)]:
+                files.append(file)
 
-    files_sorted = sorted(files)
-    return files_sorted
+        files_sorted = sorted(files)
+        return files_sorted
+    else:
+        return []
 
 def plot_all_heat_maps_cwd(file, qgrid, scatterings, seek_str):
     """
@@ -406,7 +411,8 @@ def plot_all_heat_maps_cwd(file, qgrid, scatterings, seek_str):
         try:       
             f = plot_heat_map_from_file(file, qgrid, scatterings = scatterings ) # figure object
             print(f'{file} Task Finished. Figure Number = ' , f.number)
-        except:    continue
+        except:    
+            continue
           
         pdf.savefig(f);   #f.savefig("foo.pdf", ) 
 
