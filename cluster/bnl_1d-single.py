@@ -6,9 +6,9 @@ import numpy as np
 import pylab as plt
 import os, time
 
-exp_folder = '/home/bashit.a/July-2021/'
-samples   = '/home/bashit.a/July-2021/sample-6/'
-file = "2029_Dentate_gyrus-roi0.h5"
+exp_folder = '/scratch/bashit.a/BNL-Data/Mar-2023/'
+samples   = '/scratch/bashit.a/BNL-Data/Mar-2023/1968'
+file = "1968_V1-roi0_0_0.h5"
 
 os.chdir(samples)
 

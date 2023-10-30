@@ -5,8 +5,8 @@ import numpy as np
 import pylab as plt
 import os, time
 
-exp_file = '/home/bashit.a/Nov-2021/'
-samples   = '/home/bashit.a/Nov-2021/'
+exp_file = '/scratch/bashit.a/BNL-Data/Mar-2023/Done/'
+samples   = '/scratch/bashit.a/BNL-Data/Mar-2023/Misc/'
 
 os.chdir(samples)
 

@@ -9,7 +9,7 @@ Date: 04/18/2021
 
 ## import packages
 from essential_func import *
-from scipy import signal
+# from scipy import signal
 from sklearn.manifold import TSNE
 from matplotlib.animation import FuncAnimation
 from IPython.display import display
@@ -28,7 +28,7 @@ def from_clusterFr_ceffs_to_matrix(A, cluster, coeffs):
     """
     for i, frame in enumerate(cluster):
         A[0][np.where(A[1]==frame)]=coeffs[i]
-        
+
     B = A
     return B
 
@@ -43,7 +43,7 @@ def file_preprocess(file, window_size, qgrid, q_min=None, q_max=None, normalize=
 
     Iq = read_Iq(file, 'merged', directory = directory)
     Iq = np.array([np.convolve(window, Iq[idx], mode='same') for idx in range(Iq.shape[0])  ]) if window_size>1 else Iq   # filter output using convolution
-    
+
     Iq = Iq/np.max(Iq,axis=1).reshape(-1,1) if normalize and normalize_at_q==None else Iq      # test how normalizing affecing data points print(Iq[0][:10])
     Iq = Iq/Iq[:,qgrid_to_indices(qgrid, qvalue=normalize_at_q)].reshape(-1,1) if normalize_at_q!=None else Iq      # test how normalizing affecing data points print(Iq[0][:10])
 
@@ -57,12 +57,12 @@ def plot_labels(file, labels, title=None, args = None, cmap='viridis'):
     """
         plot_labels(file, labels)
     """
-    
+
     labels_unique = np.unique(labels)       # total labels
     n_clusters_ = len(labels_unique)        # toal clusters
     print("number of estimated clusters : %d" % n_clusters_)
     #cluster_centers = ms.cluster_centers_   # get trained cluster centers
-    
+
     Width, Height = width_height(file)                             # width and height of the file
     sna = snaking(Width, Height)                                   # create snaking patterns
     A = np.array([np.zeros((Height,Width)),sna])                   # zero values matrix (A[0]=0) with frame numbers depth (A[1]=frames)
@@ -92,7 +92,7 @@ def plot_3d(X, labels, args = None, cmap='viridis'):
 
 #### Plot 3d animation
 def plot_3d_animation(X, labels, elev=35, azim=60, anim_frames=200, anim_interval=10):
-    
+
     fig, ax= plt.subplots()
     ax = plot_3d(X, labels, args = (fig, ax), cmap = discrete_cmap( N= len(np.unique(labels)), base_cmap = 'brg'))
 

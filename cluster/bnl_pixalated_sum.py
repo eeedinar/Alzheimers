@@ -14,7 +14,7 @@ import time
 from essential_func import *
 import multiprocessing
 
-samples   = '/home/bashit.a/July-2021/sample-9/'
+samples   = '/scratch/bashit.a/BNL-Data/Mar-2023/2191/'
 
 os.chdir(samples)
 files_lists = multiprocessing_lists_of_files_list(seek_str = '.h5', category_max_size_GB = 50)

@@ -15,9 +15,9 @@ qgrid2 = np.hstack([np.arange(0.005, 0.0499, 0.001), np.arange(0.05, 0.099, 0.00
 
 exp_folder = '/home/bashit.a/July-2021/'
 samples    = '/home/bashit.a/July-2021/'
-file       = '2346_EC-roi0.h5'
+file       = '2346_Dentate_gyrus-roi0.h5'
 
-args =  0, 158796, 45300  # manually can set args = (a_min.value, a_max.value, thr.value) = 0, 30000, 16000 or Get values from 3rd cell print output
+args =  0, 99024, 30500  # manually can set args = (a_min.value, a_max.value, thr.value) = 0, 30000, 16000 or Get values from 3rd cell print output
 
 os.chdir(samples)
 

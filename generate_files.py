@@ -36,7 +36,7 @@ def generate_excel_file(file, qgrid, scattering, method = 'all-frames', frame= N
             Iq = np.array(Iq.get(scattering))                          # Iq = np.array(2048_B16/processed/merged')
 
         idx_l, idx_u, _ = valid_idx_search(qgrid, Iq[:,0,:])
-        print(f'{scattering} Q = , {qgrid[idx_l:idx_u]}')
+        # print(f'{scattering} Q = , {qgrid[idx_l:idx_u]}')
         #Iq = Iq[:,0,idx_l:idx_u]                                  # Iq shape (3721, 130) skipping dI    
         Iq = Iq[:,0,:]                                            # print including nan values
         if window_size>1:

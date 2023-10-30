@@ -7,7 +7,7 @@
 #SBATCH --mem-per-cpu=16G         # memory per cpu-core (8G per cpu-core is default)
 #SBATCH --output=/home/bashit.a/Codes/slurmout/exec-%j.out                  # Standard output and error log
 #SBATCH --mail-type=END,FAIL                      # Mail events (NONE, BEGIN, END, FAIL, ALL)
-#SBATCH --mail-user=bashit.a@northeastern.edu     # Where to send mail
+#SBATCH --mail-user=bashit.a@northeastern.edu     ##  send email once completed
 
 conda init bash     # To use conda env list this command modifies ~/bashrc
 source ~/.bashrc    # this will activate the base environment, which will be reflected in your shell prompt
@@ -39,4 +39,5 @@ get_ram_info()"
 # python3 bnl_1d-single.py             # azimulthal averaging one file
 # python3 bnl_1d-cwd.py                     # azimulthal averageing all files in a folder
 # python3 bnl_pixalated_sum.py          # pixalated sum for all files in a folder
-python3 bnl_1d-single_masked.py           # azimulthal averaging one file after masking/thresholding
+# python3 bnl_1d-single_masked.py           # azimulthal averaging one file after masking/thresholding
+python3 bnl_cwd_masked.py                  # azimulthal averaging cwd-all files- after masking/thresholding

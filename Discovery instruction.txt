@@ -1,0 +1,33 @@
+#!/bin/bash
+
+srun --partition=gpu --nodes=1 --pty --gres=gpu:v100-sxm2:1 --ntasks=1 --mem=4GB --time=01:00:00 /bin/bash
+
+
+### Install here
+conda create --name pytorch_env python=3.9 -y
+source activate pytorch_env
+module load cuda/11.7
+
+pip install py4xs pandas scikit-learn
+pip install matplotlib jupyterlab ipywidgets ipympl opencv-python PyPDF2
+pip install tqdm mplcursors
+
+pip install tifffile seaborn plotly biopython nglview pystackreg
+
+### VS Code settings 
+Connection timeout to 360 seconds
+
+### VSCode running 
+source activate pytorch_env
+module load cuda/11.7
+jupyter-lab
+
+### In case if javascript error run from Mac/Windows Terminal/Command Prompt
+pip install --force-reinstall matplotlib jupyterlab ipywidgets ipympl
+conda install -c conda-forge nodejs=18
+
+### remove conda environment
+conda env remove -n pytorch_env
+
+### backup environment
+conda create -n my_env --clone pytorch_env
