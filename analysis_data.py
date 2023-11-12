@@ -172,12 +172,14 @@ class Data_Analysis():
             self.bkg_frame = np.array([bkg_frame])
             n_bkg_frame = len(self.bkg_frame.flatten())   # [6000,6001] - 2 frames
 
-            Iq_bkgs = self.Iq[ self.bkg_frame.flatten() ]                       # data.Iq[ bkg_frame.flatten() ].shape --> (2, 690)
+            Iq_bkgs = self.Iq[ self.bkg_frame.flatten() ] # data.Iq[ bkg_frame.flatten() ].shape --> (2, 690)
+            if not (self.Iq_trans==None).all():           # data.Iq_trans.shape = (7812) -> data.Iq_trans==None -> array([False, False, False, False]) --> (data.Iq_trans==None).all() = False [no trans case: array(None, dtype=object) ]
+                Iq_trans_norm = np.concatenate([ (self.Iq_trans/self.Iq_trans[fr]).reshape(-1,1) for fr in self.bkg_frame.flatten() ],axis=1)  # (7812,2)
+                Iq_bkgs = np.divide(np.dot(Iq_trans_norm,Iq_bkgs),n_bkg_frame)   # (7812,690)
 
-            Iq_trans_norm = np.concatenate([ (self.Iq_trans/self.Iq_trans[fr]).reshape(-1,1) for fr in self.bkg_frame.flatten() ],axis=1)  # (7812,2)
-            Iq_bkgs = np.divide(np.dot(Iq_trans_norm,Iq_bkgs),n_bkg_frame)   # (7812,690)
-
-            self.IqBS = self.Iq - Iq_bkgs
+                self.IqBS = self.Iq - Iq_bkgs
+            else:
+                self.IqBS = self.Iq - np.mean(Iq_bkgs, axis=0)  # np.mean(Iq_bkgs, axis=0).shape = (690,)
         else:
             self.IqBS = self.Iq
         return self.IqBS
