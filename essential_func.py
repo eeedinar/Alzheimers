@@ -71,6 +71,21 @@ def drange(start, stop, step):
         yield i
         i +=step
 
+def h5File_h5Dir_csv_loc_by_h5file(file, BNL_dir, sub_dir):
+    """ 
+        h5File_h5Dir_csv_loc_by_h5file( file = "1948_HIPPO-roi1_0_0_masked_intp.h5",  
+                                    BNL_dir     = '/Volumes/HDD/BNL-Data/Mar-2023' ,
+                                    sub_dir     = "CSV_Conv-8-point")     
+    """
+    for file_search in glob.iglob(f'{BNL_dir}/**/*', recursive=True):
+        if file_search.find(file) > -1 and file_search.endswith(".h5"):
+            directory = os.path.dirname(file_search)
+        if file_search.find(file) > -1 and f'/{sub_dir}/' in file_search:
+            csv_file = file_search
+            break
+    return file, directory, csv_file
+
+
 ### pixalated sum function
 def pixalated_sum_waxs(file, save_as_file = False, save_as_file_only = False):
     '''
