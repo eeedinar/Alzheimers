@@ -1,0 +1,15 @@
+method: random
+metric: 
+  goal: minimize
+  name: "train_loss"
+parameters: 
+  epochs :
+    value : 3000
+  lr:
+    value: 0.003
+  optimizer:
+    values: ["adam"]  # "sgd"
+  momentum:
+    values: [0.8, 0.9]
+  loss_fn:
+    values: ["focal_loss"]  # "cross_entropy"  "triplet_margin_loss"    "focal_loss"
