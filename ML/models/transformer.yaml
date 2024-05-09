@@ -1,0 +1,11 @@
+parameters:
+  n_heads : 
+    value : 1
+  hidden_dim : 
+    value: 32
+  N : 
+    value : 1
+  dropout : 
+    value : 0.1
+  seq_len :
+    value : 1
