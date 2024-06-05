@@ -75,12 +75,11 @@ def train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, 
         # negative = model(X_batch[:, 2*input_dim :]            , None)
 
         ### Zero your gradients for every batch!
-
+        optimizer.zero_grad()
         y_pred = model(X_batch, None)                             # forward pass- make predictions for this batch    model(X_batch)   model(latent)
         loss   = criterion(y_pred, torch.flatten(y_batch).long()) # Compute the loss
         # loss   = criterion(anchor, positive, negative)
-        
-        optimizer.zero_grad()
+
         loss.backward()                  # backward pass - compute the gradients
         # # gradient clipping
         # clip_value = 10.0
@@ -93,6 +92,8 @@ def train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, 
         y_pred    = torch.argmax(y_pred,1).type(torch.float32)
         avg_acc = performace_metrics(y_pred, y_batch)
 
+        # wandb.log( {"loss_func_max": criterion.input.max(), "loss_func_min": criterion.input.min()} )
+        
         ### log data to tensorboard
         # global_step = epoch*len(training_loader)+batch_idx+1
         # writer.add_scalar('train_loss', loss.item(), global_step = global_step)
@@ -147,6 +148,7 @@ def train():
         input_dim, output_dim, weights, training_loader, validation_loader = build_dataset(dataset_source, config, device, sonar_file=sonar_file)
         model     = build_model(network, yaml_model, config, device, input_dim, output_dim)
         optimizer = build_optimizer(optimizer, model, lr, momentum)
+        es = EarlyStopping()
         criterion = build_loss(loss_fn, weights)
         # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.3, patience=100, threshold=1e-4, min_lr=1e-6, verbose=True)
 
@@ -154,10 +156,12 @@ def train():
         wandb.watch(model, optimizer, log="all", log_freq=10)
 
         best_loss  = 1000     # init to None
-        best_vacc   = -np.inf  # init to negative infinity
+        best_acc   = -np.inf  # init to negative infinity
         
-        for epoch in range(epochs):
-
+        epoch = 0
+        done = False
+        while epoch < epochs and not done:
+            epoch +=1
             model.train()                                                         # Make sure gradient tracking is on, and do a pass over the training data
             avg_loss, avg_acc = train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, writer)  
 
@@ -184,14 +188,20 @@ def train():
                 y_pred    = torch.argmax(out,1).type(torch.float32)
                 avg_vacc = performace_metrics(y_pred, y_val)
             
+            if es(model, avg_vloss.item(), epoch):
+                done = True
+                destination= PATH+'_'+f'{es.best_epoch}'+'_BEST_VLoss_'+f'{es.best_vloss:0.2f}'
+                torch.save(es.best_model, destination)
+
             ### log data to weights and biases
             wandb.log( {"train_loss": avg_loss, "val_loss": avg_vloss.item() } )
             # metrics = {} # "train/epoch": global_step,
             # wandb.log(metrics)
 
-            print('Epoch {}/{} : Loss - training: {} validation: {} Validation Accuracy: {}'.format(epoch, epochs, avg_loss, avg_vloss, avg_vacc))
+            print(f'Epoch {epoch}/{epochs} : Loss - training: {avg_loss:0.6f} validation: {avg_vloss:0.6f} Validation Accuracy: {avg_vacc:0.4f} ES: {es.status}')
             writer.add_scalars('Training vs Validation Loss', {'Training' : avg_loss, 'Validation' : avg_vloss}, epoch+1)      # Log the running loss averaged for both training and validation            
             
+
 
             # ax = plt.axes()
             # file, directory, csv_file = h5File_h5Dir_csv_loc_by_h5file(val_files[0], BNL_dir, sub_dir)
@@ -205,8 +215,8 @@ def train():
             # writer.add_figure(f'Prediction:{file}', sn.heatmap(img_orig , ax=ax).get_figure(), global_step=epoch)
 
             # Save model
-            if avg_loss < best_loss:   # avg_vacc > best_vacc     avg_vloss < best_vloss
-                best_loss  = avg_loss
+            if avg_loss < best_loss:   # avg_vacc > best_vacc     
+                best_loss = avg_loss
                 best_acc  = avg_acc
 
                 # try: os.remove(destination)                    
