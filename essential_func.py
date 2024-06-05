@@ -547,8 +547,8 @@ def file_polyfit_heatmap_plot(file, indices, qgrid2):
             axs[0, idx_indices].scatter(X_test[max_ind], y_test[max_ind], color = 'blue', marker='^', label = 'max point')
             axs[0, idx_indices].scatter(X_test[max_ind], np.polyval(coefs, X_test[max_ind]), color = 'orange' , marker=r'$\clubsuit$' ,label = 'ref point')
             axs[0, idx_indices].annotate("", (X_test[max_ind], y_test[max_ind]) , (X_test[max_ind], np.polyval(coefs, X_test[max_ind])), arrowprops={'arrowstyle':'<-'})
-            axs[0, idx_indices].set(title = f'Poly_ord {poly_ord} Frame - {frame_polyfit} {comment}' ,
-                        xlabel = 'X' , ylabel = 'y', xscale='linear', yscale = 'linear' )
+            axs[0, idx_indices].set(title = f'Poly_ord {poly_ord} {qgrid2[idx_l_t+max_ind]:.2f} - {frame_polyfit} {comment}' ,
+                        xlabel = 'X' , ylabel = 'y', xscale='linear', yscale = 'linear')
             axs[0, idx_indices].legend()
 
             ## gather heat map data
@@ -611,7 +611,7 @@ def show_colorbar(im,f,ax, position="right", ticks=None):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes(position, size="2%", pad=0.05)
     cax.clear()
-    plt.colorbar(im, cax=cax, orientation='vertical', ticks=ticks)
+    f.colorbar(im, cax=cax, orientation='vertical', ticks=ticks)
 
 def global_thresholding(input_array, thr, binary_inv = False):
     """
@@ -929,13 +929,14 @@ def linear_fit(xData, yData, ):
     rsq = r_val**2;   # rsquare value    
     return np.round([slope, intercept, rsq, p_val, std_err], 4)
 
-def plot_linear_lines(xData, yData, indices):
+def plot_linear_lines(xData, yData, indices, args):
     """
     indices = [2,17,17,52,52,109]
     function call:  plot_linear_lines(xData, yData, indices)
     """
+    f,ax = args
     Nsplits = int(len(indices)/2)                                   # retriving number of splits
-    f, ax = plt.subplots(nrows=1, ncols=1, figsize=(10,5))          # plot figure                                                  
+                                                   
     color = ['red', 'black', 'green', 'blue', 'brown', 'magenta','cyan','purple']   # color sets for 3 line fittings only
 
     for i in range(0,Nsplits):
