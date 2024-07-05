@@ -1,7 +1,7 @@
 from lesions import *
 from utils import *
 from torch import nn, optim
-import yaml, json
+import yaml, json, copy
 from sklearn.metrics import balanced_accuracy_score
 
 # loss and optimizer definition
@@ -19,15 +19,17 @@ class FocalLoss(nn.Module):
         self.weights = weights
 
     def forward(self, input, target):
-        self.logpt = F.log_softmax(input, dim=1)
+        self.input = input
+        self.logpt = F.log_softmax(self.input, dim=1)
         self.pt    = torch.exp(self.logpt)
-        prob  = ((1-self.pt)**self.gamma)*torch.log(self.pt)
-        loss  = F.nll_loss(prob, target, self.weights)
-        return loss
+        self.prob  = ((1-self.pt)**self.gamma)*torch.log(self.pt)
+        self.loss  = F.nll_loss(self.prob, target, self.weights)
+        # print(self.input, self.logpt, self.pt   , self.prob , self.loss )
+        return self.loss
 
 def build_optimizer(optimizer, model, lr, momentum=0.9):
     if optimizer == "adam":
-        optimizer = optim.Adam(model.parameters(), lr=lr)  
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     elif optimizer == "sgd":
         optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
     return optimizer
@@ -105,3 +107,34 @@ def build_loss(loss_func, weights):
     elif loss_func == 'triplet_margin_loss':
         return torch.nn.TripletMarginLoss(margin=1.0, p=2, eps=1e-7)
     return
+
+
+
+class EarlyStopping:
+    def __init__(self, patience=2000, min_delta=0, restore_best_model=True):
+        self.patience  = patience
+        self.min_delta = min_delta
+        self.restore_best_model = restore_best_model
+        self.counter = 0
+        self.best_model = None
+        self.best_vloss = None
+        self.status = ""
+        self.best_epoch = 0
+
+    def __call__(self, model, val_loss, epoch):
+        if self.best_vloss is None or (self.best_vloss - val_loss) >= self.min_delta:
+            self.counter = 0
+            self.status = f'Imrovement VLoss'
+            self.best_vloss = val_loss
+            self.best_model = copy.deepcopy(model.state_dict())
+            self.best_epoch = epoch
+        else:
+            self.counter += 1
+            self.status = f'No Imrovement VLoss {self.counter}'
+            if self.counter == self.patience:
+                self.status = f'model is triggering after patience:{self.counter}, min_delta:{self.min_delta}'
+                if self.restore_best_model:
+                    self.status += f' Restoreing Epoch:{self.best_epoch}, VLoss:{self.best_vloss}'
+                    model.load_state_dict(self.best_model)
+                return True
+        return False

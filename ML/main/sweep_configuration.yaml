@@ -4,7 +4,7 @@ metric:
   name: "train_loss"
 parameters: 
   epochs :
-    value : 3000
+    value : 10000
   lr:
     value: 0.003
   optimizer:

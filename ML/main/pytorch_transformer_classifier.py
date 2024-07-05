@@ -12,7 +12,7 @@ import sys, os, inspect, glob, h5py, json,copy, yaml
 import wandb
 import random
 
-# Ensure deterministic behavior
+### ensure deterministic behavior
 set_seed = 40
 torch.backends.cudnn.deterministic = True
 random.seed(set_seed)
@@ -27,14 +27,14 @@ print(currentdir, parentdir)
 sys.path.insert(0, os.path.join(parentdir, 'dataloader'))
 sys.path.insert(0, os.path.join(parentdir, 'models'))
 
-# loading dataset and model from directory
-from utils import *
+### loading dataset and model from directory
+from utils        import *
 from train_builds import *
 
 device         = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 wandb.login()     # wandb
 
-### File Locations
+### file Locations
 with  open('sweep_configuration.yaml') as file_sweep :    
     config = yaml.load(file_sweep, Loader=yaml.FullLoader)
 
@@ -150,7 +150,7 @@ def train():
         optimizer = build_optimizer(optimizer, model, lr, momentum)
         es = EarlyStopping()
         criterion = build_loss(loss_fn, weights)
-        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.3, patience=100, threshold=1e-4, min_lr=1e-6, verbose=True)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.9, patience=200, threshold=1e-4, min_lr=1e-6, verbose=True)
 
         writer = SummaryWriter('../runs/training_{}'.format(lr))               # tensorboard object creation
         wandb.watch(model, optimizer, log="all", log_freq=10)
@@ -183,7 +183,7 @@ def train():
                 # avg_vloss   = criterion(anchor, positive, negative)
 
                 # Note that step should be called after validate()
-                # scheduler.step(avg_vloss)  
+                scheduler.step(avg_vloss)  
 
                 y_pred    = torch.argmax(out,1).type(torch.float32)
                 avg_vacc = performace_metrics(y_pred, y_val)
