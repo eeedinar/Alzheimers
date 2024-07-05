@@ -1,4 +1,4 @@
-parameters:  
+parameters:
   qvalue_lower_bound :
     value: 1.0
   qvalue_upper_bound :
@@ -14,4 +14,4 @@ parameters:
   sub_dir      : 
     value : "CSV_Conv-8-point"               # CSV_Conv-8-point  CSV
   val_files    : 
-    value : ["1898_CING-roi0_0_0_masked_intp.h5"]   # ["1948_EC-roi1_0_0_masked.h5"]     # None ["1948_HIPPO-roi1_0_0_masked_intp.h5", "2428-roi1_0_0_masked_intp.h5"] ["1948 V1-roi0_0_0_masked.h5"]
+    value : ["1948 V1-roi0_0_0_masked.h5"]   # ["1948_EC-roi1_0_0_masked.h5"]     # None ["1948_HIPPO-roi1_0_0_masked_intp.h5", "2428-roi1_0_0_masked_intp.h5"] ["1948 V1-roi0_0_0_masked.h5"]
