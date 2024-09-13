@@ -8,7 +8,7 @@ Date: 01/01/2021
 ########################### ---------- Essential functions ---------- ###########################
 
 ## import packages
-import os, shutil, h5py, time, json, cv2, copy
+import os, shutil, h5py, time, json, cv2, copy, glob
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf                        # pdf generation package
@@ -170,7 +170,7 @@ def valid_idx_search(qgrid, Iq, show_q = False):
 
         function call: 
         idx_l, idx_u, valid_diff_values = valid_idx_search(qgrid2, Iq)
-        
+
         retrun:
             idx_l = first valid   indices    SAXS = 2,   WAXS = 109 , merged = 0
             idx_u = first invalid indices    SAXS = 125, WAXS = 579 , merged = 690
