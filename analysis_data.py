@@ -147,31 +147,6 @@ def sort_labels(labels):
 #     print(new_labels)
     return new_labels
 
-# def Iq_scaling(Iq_input, Iq_scale, seek_mf, method = 'MSE'):
-#     ll, ul, inc = seek_mf
-#     mul_factor  = np.arange(ll, ul, inc)                                  # scaling factor lookup region
-#     err = {}; 
-#     err['MF']  = np.zeros(len(mul_factor)); 
-#     err['MSE'] = np.zeros(len(mul_factor)); 
-#     err['NEG'] = np.zeros((len(mul_factor), Iq_scale.shape[1]));
-#     for idx, mf in enumerate(mul_factor):
-#         err['MF'][idx] = mf
-#         if method == 'NEG':
-#             err['NEG'][idx] = Iq_input - mf*Iq_scale
-#         elif method == 'MSE':
-#             err['MSE'][idx] = np.mean(np.square(Iq_input - mf*Iq_scale ),axis=1);   # mean square error for scaling
-
-#     if method == 'NEG':
-#         temp = np.zeros(len(mul_factor))
-#         for idx, mf in enumerate(mul_factor):
-#             temp[idx] = (err['NEG'][idx]>0).all()                                         # mf is determined by minimum MSE
-#         mf = round(err['MF'][temp.argmin()],4)
-#     elif method == 'MSE':
-#         minIdx = err['MSE'].argmin()                                         # mf is determined by minimum MSE
-#         mf = round(err['MF'][minIdx],4)
-#     return mf
-
-
 def Iq_scaling(Iq_input, Iq_scale, seek_mf, method = 'MSE'):
     ll, ul, inc = seek_mf
     mul_factor  = np.round(np.arange(ll, ul, inc),6)                                  # scaling factor lookup region
@@ -188,6 +163,15 @@ def Iq_scaling(Iq_input, Iq_scale, seek_mf, method = 'MSE'):
         mf[idx] = sorted(err['MSE'].items(), key= lambda x: x[1][idx])[0][0]
     return mf
 
+def Iq_area_sub(qgrid, scaling_for, scaling_by, mf, area_minQ, area_maxQ):
+    idx_start, idx_end = qgrid_to_indices(qgrid, area_minQ) , qgrid_to_indices(qgrid, area_maxQ)        # area_minQ => (290,310) 
+    area = np.trapz(y=scaling_for[:, idx_start:idx_end] - mf*scaling_by[:,idx_start:idx_end], x=qgrid[idx_start:idx_end], axis=1)
+    return area
+
+def Iq_mse_sub(qgrid, scaling_for, scaling_by, mf, mse_minQ, mse_maxQ):
+    idx_start, idx_end = qgrid_to_indices(qgrid, mse_minQ) , qgrid_to_indices(qgrid, mse_maxQ)        # area_minQ => (290,310) 
+    mse = np.mean(np.square(scaling_for[:, idx_start:idx_end] - mf*scaling_by[:,idx_start:idx_end]))
+    return mse
 
 class Data_Analysis():
 
@@ -259,7 +243,7 @@ class Data_Analysis():
         self.input_fr  = input_fr
         self.area_minQ = area_minQ
         self.area_maxQ = area_maxQ
-        self.input_fr_to_index = {k:v for k,v in zip(input_fr, np.arange(0, len(input_fr)))} if not isinstance(input_fr, int) else {input_fr:0}
+        self.input_fr_to_index = {k:v for k,v in zip(input_fr, np.arange(0, len(input_fr)))} if not isinstance(input_fr, (int, np.int32, np.int64)) else {input_fr:0}
 
         ### extract scaling region intensities
         self.scaling_for = self.IqBS[self.input_fr] if isinstance(input_fr, list|tuple) else self.IqBS[[self.input_fr]]                                  # background subtracted amyloid
@@ -279,8 +263,7 @@ class Data_Analysis():
         self.mf = Iq_scaling(Iq_input, Iq_scale, seek_mf, method) # Iq_input.shape = (1,60), Iq_scale.shape = (1,60)
 
         ### find area - composite trapezoidal rule in ROI - (area_minQ, area_maxQ)
-        idx_start, idx_end = qgrid_to_indices(self.qgrid, self.area_minQ) , qgrid_to_indices(self.qgrid, self.area_maxQ)        # area_minQ => (290,310) 
-        self.area = np.trapz(y=self.scaling_for[:, idx_start:idx_end] - self.mf*self.scaling_by[:,idx_start:idx_end], x=self.qgrid[idx_start:idx_end], axis=1)
+        self.area = Iq_area_sub(self.qgrid, self.scaling_for, self.scaling_by, self.mf, self.area_minQ, self.area_maxQ)
 
         if show_result:
             print('MF = ', self.mf, f'AREA: {round(self.qgrid[idx_start],3)}~{round(self.qgrid[idx_end],3)} = ', self.area)  # show only if plot
