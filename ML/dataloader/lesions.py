@@ -44,7 +44,6 @@ def get_dataframe_with_files_loc(file, sheet, BNL_dir, sub_dir):
                 break
     return df
 
-
 def train_val_split_dataset(func):
     def wrapper(*args, **kwargs):
         file, sheet, BNL_dir, sub_dir, val_files = args
@@ -87,9 +86,47 @@ def Iq_scaling(Iq_input, Iq_scale, seek_mf, method = 'MSE'):
         mf[idx] = sorted(err['MSE'].items(), key= lambda x: x[1][idx])[0][0]
     return mf
 
+
+def get_intensities(df, column_name, label, BNL_dir, sub_dir):
+    ### Variables for bkg column
+    file_loc   = []
+    frames_bkg = []
+    Iq_values  = []
+    labels_out = []
+    frames_out = []
+    files_out  = []
+    indices    = df[column_name].dropna().index
+
+    for idx in indices:
+
+        if type(ast.literal_eval( df.iloc[idx][column_name]) ) == dict:
+            # if not any([file in file_ for file_ in file_loc]):
+            file   = list(ast.literal_eval( df.iloc[idx][column_name] ).keys())[0]
+            if not any([file in file_ for file_ in file_loc]):   ## if already added to the stack do not add it again
+                frames = flatten( list ( ast.literal_eval( df.iloc[idx][column_name]).values()) )
+
+                for file_search in glob.iglob(f'{BNL_dir}/**/*', recursive=True):
+                    if file_search.find(file) > -1 and f'/{sub_dir}/' in file_search:
+                        file_loc.append(file_search)
+                        break
+                frames_bkg.append(frames)
+        else:
+            file = df.iloc[idx]['File']
+            if not any([file in file_ for file_ in file_loc]):
+                frames = flatten(list(ast.literal_eval( df.iloc[idx][column_name])))
+                frames_bkg.append(frames)
+                file_loc.append(df.iloc[idx]['File_Loc'])
+    for file, frame in zip(file_loc, frames_bkg):
+        df_temp     = pd.read_csv(file, delimiter=",", header=0)
+        Iq_values.append( df_temp.iloc[frame].values.tolist() )
+        labels_out += [label]*len(frame)
+        frames_out += frame
+        files_out  += [file]*len(frame)
+    return np.vstack(Iq_values), np.array(labels_out), np.array(frames_out), np.array(files_out)   
+
 class XrayData(Dataset):
 
-    def __init__(self, df, column_names, BNL_dir, sub_dir, lidx=0, uidx=690, mica_sub=True, mica_Iq = None, tissue_sub=True, tissue_Iq = None, tissue_sub_indices = (360, 420), seek_mf = (-12,12,0.01), scaling=False):
+    def __init__(self, df, column_names, BNL_dir, sub_dir, lidx=0, uidx=690, mica_sub=True, mica_Iq = None, tissue_sub=False, tissue_Iq = None, tissue_sub_indices = (360, 420), seek_mf = (-12,12,0.01), scaling=False):
 
         x_raw      = np.array([])
         labels_out = np.array([])
@@ -97,7 +134,7 @@ class XrayData(Dataset):
         files_out  = np.array([]) 
 
         for column_name,label in column_names.items():
-            Iq_values, labels, frames, files =  self.get_intensities(df, column_name, label, BNL_dir, sub_dir)
+            Iq_values, labels, frames, files =  get_intensities(df, column_name, label, BNL_dir, sub_dir)
             print(f'{column_name} : contains {frames.size} samples')
             x_raw         = np.vstack([x_raw, Iq_values]) if x_raw.size else Iq_values
             labels_out    = np.hstack([labels_out, labels]) if labels_out.size else labels
@@ -108,7 +145,7 @@ class XrayData(Dataset):
             if isinstance(mica_Iq, np.ndarray):
                 self.Iq_bkg = mica_Iq
             else:
-                Iq_bkg , _, _, _ =  self.get_intensities(df, column_name='bkg', label=0, BNL_dir=BNL_dir, sub_dir=sub_dir)
+                Iq_bkg , _, _, _ =  get_intensities(df, column_name='bkg', label=0, BNL_dir=BNL_dir, sub_dir=sub_dir)
                 self.Iq_bkg = np.mean(Iq_bkg, axis=0)
                 file = open("mica_bkg", "wb")              # Open a binary file in write mode
                 np.save(file, self.Iq_bkg)                 # Save array to the file
@@ -119,7 +156,7 @@ class XrayData(Dataset):
                 if isinstance(tissue_Iq, np.ndarray):
                     self.Iq_tissue = tissue_Iq
                 else:
-                    Iq_tissue , _, _, _ =  self.get_intensities(df, column_name='Tissue', label=1, BNL_dir=BNL_dir, sub_dir=sub_dir)
+                    Iq_tissue , _, _, _ =  get_intensities(df, column_name='Tissue', label=1, BNL_dir=BNL_dir, sub_dir=sub_dir)
                     self.Iq_tissue = np.mean(Iq_tissue, axis=0, keepdims=True)
                     file = open("tissue_Iq", "wb")              # Open a binary file in write mode
                     np.save(file, self.Iq_tissue)               # Save array to the file
@@ -141,43 +178,7 @@ class XrayData(Dataset):
         self.frames    = frames_out
         self.files     = files_out
 
-    @staticmethod
-    def get_intensities(df, column_name, label, BNL_dir, sub_dir):
-        ### Variables for bkg column
-        file_loc   = []
-        frames_bkg = []
-        Iq_values  = []
-        labels_out = []
-        frames_out = []
-        files_out  = []
-        indices    = df[column_name].dropna().index
-
-        for idx in indices:
-
-            if type(ast.literal_eval( df.iloc[idx][column_name]) ) == dict:
-                # if not any([file in file_ for file_ in file_loc]):
-                file   = list(ast.literal_eval( df.iloc[idx][column_name] ).keys())[0]
-                if not any([file in file_ for file_ in file_loc]):   ## if already added to the stack do not add it again
-                    frames = flatten( list ( ast.literal_eval( df.iloc[idx][column_name]).values()) )
-
-                    for file_search in glob.iglob(f'{BNL_dir}/**/*', recursive=True):
-                        if file_search.find(file) > -1 and f'/{sub_dir}/' in file_search:
-                            file_loc.append(file_search)
-                            break
-                    frames_bkg.append(frames)
-            else:
-                file = df.iloc[idx]['File']
-                if not any([file in file_ for file_ in file_loc]):
-                    frames = flatten(list(ast.literal_eval( df.iloc[idx][column_name])))
-                    frames_bkg.append(frames)
-                    file_loc.append(df.iloc[idx]['File_Loc'])
-        for file, frame in zip(file_loc, frames_bkg):
-            df_temp     = pd.read_csv(file, delimiter=",", header=0)
-            Iq_values.append( df_temp.iloc[frame].values.tolist() )
-            labels_out += [label]*len(frame)
-            frames_out += frame
-            files_out  += [file]*len(frame)
-        return np.vstack(Iq_values), np.array(labels_out), np.array(frames_out), np.array(files_out)                    
+                 
 
     def __getitem__(self, index):
         return (self.x[index], self.y[index])
@@ -225,7 +226,7 @@ class triplet_data_generator(XrayData):
 def get_dataloaders_random_split(Excel_File, sheet, BNL_dir, sub_dir, column_names, lidx=0, uidx=690):
 
     batch_size  = 4096
-    train_split = .8
+    train_split = 0.8
     shuffle_dataset = True
     random_seed = 42
 
@@ -276,7 +277,6 @@ def get_sonar_dataloaders(sonar_file):
             encoder = LabelEncoder()
             encoder.fit(y)
             self.y = encoder.transform(y)
-
 
             ### convert it to tensor
             self.X = torch.tensor(self.X, dtype=torch.float32)
