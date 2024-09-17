@@ -89,7 +89,7 @@ class PositionalEncodings(nn.Module):
         super().__init__()
 
         half_len = embedding_dim //2
-        print('embeddimg dim is ',embedding_dim)
+        print('embedding dim is ',embedding_dim)
         assert embedding_dim %2 ==0 , "embedding dimension must be divisible by 2"
         pe  = torch.zeros(seq_len, embedding_dim)
 
@@ -252,9 +252,9 @@ class OutputFeedForward(nn.Module):
         self.layer2_dim = (input_dim + 2*padding - dilation*(kernel_size-1) - 1)//stride + 1 
         self.act2    = nn.LeakyReLU(0.1)
         # print(self.layer2_dim)
-        self.feature  = nn.Linear(self.layer2_dim, self.layer2_dim, bias=False)
-        self.const    = torch.diag( torch.ones(self.layer2_dim) )
-        self.feature.weight = nn.Parameter(self.const)
+        # self.feature  = nn.Linear(self.layer2_dim, self.layer2_dim, bias=False)
+        # self.const    = torch.diag( torch.ones(self.layer2_dim) )
+        # self.feature.weight = nn.Parameter(self.const)
 
         self.layer3  = nn.Linear(self.layer2_dim, 8)
         self.act3    = nn.LeakyReLU(0.1)
@@ -267,7 +267,7 @@ class OutputFeedForward(nn.Module):
         x      = self.act2(self.layer2(x))
         
         # self.feature.weight.data.mul_(self.const)
-        x      = self.feature(x)
+        # x      = self.feature(x)
         
 
         x      = x.view(-1,x.size()[-1])
