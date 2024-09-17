@@ -39,7 +39,6 @@ def performace_metrics(y_pred, y_true):
     avg_vacc = balanced_accuracy_score(y_true, y_pred)
     return avg_vacc
 
-
 def build_dataset(dataset_source, config, device, yaml_file=None, sonar_file=None):
     """
         read yaml_file, update config parameters, and return train and test dataloader, and weights to the device
@@ -107,7 +106,6 @@ def build_loss(loss_func, weights):
     elif loss_func == 'triplet_margin_loss':
         return torch.nn.TripletMarginLoss(margin=1.0, p=2, eps=1e-7)
     return
-
 
 
 class EarlyStopping:

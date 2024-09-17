@@ -200,8 +200,6 @@ def train():
 
             print(f'Epoch {epoch}/{epochs} : Loss - training: {avg_loss:0.6f} validation: {avg_vloss:0.6f} Validation Accuracy: {avg_vacc:0.4f} ES: {es.status}')
             writer.add_scalars('Training vs Validation Loss', {'Training' : avg_loss, 'Validation' : avg_vloss}, epoch+1)      # Log the running loss averaged for both training and validation            
-            
-
 
             # ax = plt.axes()
             # file, directory, csv_file = h5File_h5Dir_csv_loc_by_h5file(val_files[0], BNL_dir, sub_dir)
