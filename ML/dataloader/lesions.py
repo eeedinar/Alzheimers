@@ -48,13 +48,18 @@ def train_val_split_dataset(func):
     def wrapper(*args, **kwargs):
         file, sheet, BNL_dir, sub_dir, val_files = args
         df = func(file, sheet, BNL_dir, sub_dir)
-        val_indices = [df[df['File']==file].index.item() for file in val_files]
-        df_val = df.iloc[val_indices]
-        df_val.reset_index(inplace=True)
-        df_train = df.drop(val_indices)
-        df_train.reset_index(inplace=True)
+        if val_files:
+            val_indices = [df[df['File']==file].index.item() for file in val_files]
+            df_val = df.iloc[val_indices]
+            df_val.reset_index(inplace=True)
+            df_train = df.drop(val_indices)
+            df_train.reset_index(inplace=True)
+            return df_train, df_val
+        else:
+            df_val = None
+            return df, df_val
         # df_valid = df.iloc[indices]
-        return df_train, df_val
+        
     return wrapper
 
 
@@ -333,7 +338,7 @@ def get_dataloaders_fixed_val_files(Excel_File, sheet, BNL_dir, sub_dir, column_
     print('Setting Training Dataset ...')
     dataset_train = XrayData(df_train, column_names, BNL_dir, sub_dir, lidx=lidx, uidx=uidx, mica_sub=mica_sub, scaling=scaling)
     print('Setting Validation Dataset ...')
-    dataset_val   = XrayData(df_val, column_names, BNL_dir, sub_dir, lidx=lidx, uidx=uidx, mica_sub=mica_sub, scaling=scaling)
+    dataset_val   = XrayData(df_val, column_names, BNL_dir, sub_dir, lidx=lidx, uidx=uidx, mica_sub=mica_sub, scaling=scaling) if df_val else None
 
     # Calculate weights
     weights = compute_class_weight(class_weight="balanced", classes=np.unique(dataset_train.y), y=dataset_train.y.ravel())
@@ -341,8 +346,8 @@ def get_dataloaders_fixed_val_files(Excel_File, sheet, BNL_dir, sub_dir, column_
     print([f'weight {i} : {weight:0.2f} ' for i,weight in enumerate(weights)])
 
     training_loader   = DataLoader(dataset_train, batch_size=batch_size, num_workers=0)
-    validation_loader = DataLoader(dataset_val, batch_size=batch_size, num_workers=0)
-    print("training_loader size : {} ; validation_loader size : {}".format(len(training_loader), len(validation_loader)))
+    validation_loader = DataLoader(dataset_val, batch_size=batch_size, num_workers=0) if dataset_val else None
+    print("training_loader size : {} ; validation_loader size : {}".format(len(training_loader), len(validation_loader) if validation_loader else None))
 
     return weights, training_loader, validation_loader
 
@@ -351,11 +356,11 @@ if __name__ == '__main__':
 
     lidx = 250
     uidx = 340
-    column_names= {"Diffuse_Plaque":1. }    # {"Diffuse_Plaque":0., "Neurofibrillary_Tangle_(tau)":1. , "Tau":2. ,"Neuritic_Plaque":3., "Tissue":4., "bkg":5.0 }
+    column_names= {"bkg":1. }    # {"Diffuse_Plaque":0., "Neurofibrillary_Tangle_(tau)":1. , "Tau":2. ,"Neuritic_Plaque":3., "Tissue":4., "bkg":5.0 }
     Excel_File  = "/Users/bashit.a/Documents/Alzheimer/Mar-2023/Mar-2023-Samples-updated.xlsx"   # "/home/bashit.a/Codes/ML/Mar-2023-Samples.xlsx"   "/Users/bashit.a/Documents/Alzheimer/Mar-2023/Mar-2023-Samples.xlsx"    sheet       = 'Mar-2023-Samples'
     BNL_dir     = '/Volumes/HDD/BNL-Data/Mar-2023'    # '/Volumes/HDD/BNL-Data/Mar-2023'         '/scratch/bashit.a/BNL-Data/Mar-2023'
     sub_dir     = "CSV_Conv-8-point"  # CSV_Conv-8-point  CSV
-    val_files   = ["1948 V1-roi0_0_0_masked.h5"] # None ["1948_HIPPO-roi1_0_0_masked_intp.h5", "2428-roi1_0_0_masked_intp.h5"]
+    val_files   = None # ["1948 V1-roi0_0_0_masked.h5"] # None ["1948_HIPPO-roi1_0_0_masked_intp.h5", "2428-roi1_0_0_masked_intp.h5"]
     sheet       = 'Mar-2023-Samples'
     mica_sub = True
     scaling  = False
