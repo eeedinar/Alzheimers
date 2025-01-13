@@ -352,7 +352,7 @@ class Snaking_frames_search:
         x, y = frame_idx[0]
         for i in np.arange(x-kernal_inc,x+kernal_inc+1):
             for j in np.arange(y-kernal_inc,y+kernal_inc+1):
-                if (i,j) ==(x,y) or (i>=0 and j>=0 and i<self.Height and j <self.Width):
+                if (i,j) !=(x,y) and (i>=0 and j>=0 and i<self.Height and j <self.Width):
                     kernel_indices.append((i,j))
 
         return self.idx_to_frame(kernel_indices)
