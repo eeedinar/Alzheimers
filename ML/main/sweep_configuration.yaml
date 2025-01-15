@@ -6,10 +6,10 @@ parameters:
   epochs :
     value : 10000
   lr:
-    value: 0.003
+    value: 0.005
   optimizer:
     values: ["adam"]  # "sgd"
   momentum:
-    values: [0.8, 0.9]
+    values: [0.9]
   loss_fn:
-    values: ["focal_loss"]  # "cross_entropy"  "triplet_margin_loss"    "focal_loss"
+    values: ["cross_entropy" ]  # "cross_entropy"  "triplet_margin_loss"    "focal_loss"

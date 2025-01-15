@@ -1,0 +1,28 @@
+model saved to - /Users/bashit.a/Documents/Alzheimer/Codes/ML/runs/model_5655_BEST_VLoss_0.32
+Epoch 7655/10000 : Loss - training: 0.384093 validation: 0.609865 Validation Accuracy: 0.7673 ES: model is triggering after patience:2000, min_delta:0 Restoreing Epoch:5655, VLoss:0.3198421895503998
+embedding dim is  90
+model is in cuda ? False
+==========================================================================================
+Layer (type:depth-idx)                   Output Shape              Param #
+==========================================================================================
+├─OutputFeedForward: 1-1                 [-1, 2]                   --
+|    └─Conv1d: 2-1                       [-1, 1, 86]               6
+|    └─LeakyReLU: 2-2                    [-1, 1, 86]               --
+|    └─Linear: 2-3                       [-1, 2]                   174
+|    └─LeakyReLU: 2-4                    [-1, 2]                   --
+|    └─Dropout: 2-5                      [-1, 2]                   --
+|    └─Linear: 2-6                       [-1, 2]                   6
+==========================================================================================
+Total params: 186
+Trainable params: 186
+Non-trainable params: 0
+Total mult-adds (M): 0.00
+==========================================================================================
+Input size (MB): 0.00
+Forward/backward pass size (MB): 0.00
+Params size (MB): 0.00
+Estimated Total Size (MB): 0.00
+==========================================================================================
+training accuracy: 0.8412
+validation accuracy: 0.8295
+testing accuracy: 0.8415

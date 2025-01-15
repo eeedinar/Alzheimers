@@ -11,6 +11,7 @@ import matplotlib.pylab as plt
 import sys, os, inspect, glob, h5py, json,copy, yaml
 import wandb
 import random
+from torchsummary import summary
 
 ### ensure deterministic behavior
 set_seed = 40
@@ -42,7 +43,7 @@ yaml_file      = "/Users/bashit.a/Documents/Alzheimer/Codes/ML/dataloader/lesion
 yaml_model     = "/Users/bashit.a/Documents/Alzheimer/Codes/ML/models/transformer.yaml"
 sonar_file     = "/Users/bashit.a/Documents/Alzheimer/Codes/ML/dataloader/sonar.csv"
 dataset_source = "mar-2023"                # "sonar"    "mar-2023"
-network        = "transformer"
+network        = 'transformer' # "transformer"
 
 # timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')                          # filename for tensorboard
 PATH = os.path.join(parentdir, 'runs/model')            # path where model is saved
@@ -60,7 +61,7 @@ if network == 'transformer':
 
 # print(json.dumps(config,indent=2))
 
-def train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, writer):
+def train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, weights, writer):
 
     running_loss = 0.
     for batch_idx, inputs in enumerate(training_loader):
@@ -68,8 +69,8 @@ def train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, 
         ### extract inputs from batches
         # X_batch = inputs[0].view(-1,input_dim)
         X_batch = inputs[0].to(device)
-        y_batch = inputs[1].to(device)
-        
+        y_batch = torch.flatten(inputs[1]).long().to(device)  # remove column dimenstion
+
         # anchor   = model(X_batch[:,             : input_dim]  , None)
         # positive = model(X_batch[:, input_dim   : 2*input_dim], None)
         # negative = model(X_batch[:, 2*input_dim :]            , None)
@@ -77,7 +78,7 @@ def train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, 
         ### Zero your gradients for every batch!
         optimizer.zero_grad()
         y_pred = model(X_batch, None)                             # forward pass- make predictions for this batch    model(X_batch)   model(latent)
-        loss   = criterion(y_pred, torch.flatten(y_batch).long()) # Compute the loss
+        loss   = criterion(y_pred, y_batch) # Compute the loss
         # loss   = criterion(anchor, positive, negative)
 
         loss.backward()                  # backward pass - compute the gradients
@@ -90,7 +91,9 @@ def train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, 
 
         ### accuracy
         y_pred    = torch.argmax(y_pred,1).type(torch.float32)
-        avg_acc = performace_metrics(y_pred, y_batch)
+        
+        # avg_acc   = weighted_balanced_accuracy(y_pred, y_batch, weights)
+        avg_acc   = performace_metrics(y_pred, y_batch)
 
         # wandb.log( {"loss_func_max": criterion.input.max(), "loss_func_min": criterion.input.min()} )
         
@@ -145,12 +148,12 @@ def train():
         momentum  = config.momentum
         loss_fn   = config.loss_fn
 
-        input_dim, output_dim, weights, training_loader, validation_loader = build_dataset(dataset_source, config, device, sonar_file=sonar_file)
+        input_dim, output_dim, weights, training_loader, validation_loader, testing_loader = build_dataset(dataset_source, config, device, sonar_file=sonar_file)
         model     = build_model(network, yaml_model, config, device, input_dim, output_dim)
         optimizer = build_optimizer(optimizer, model, lr, momentum)
         es = EarlyStopping()
         criterion = build_loss(loss_fn, weights)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.9, patience=200, threshold=1e-4, min_lr=1e-6, verbose=True)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.9, patience=800, threshold=1e-4, min_lr=1e-6, verbose=True)
 
         writer = SummaryWriter('../runs/training_{}'.format(lr))               # tensorboard object creation
         wandb.watch(model, optimizer, log="all", log_freq=10)
@@ -163,15 +166,15 @@ def train():
         while epoch < epochs and not done:
             epoch +=1
             model.train()                                                         # Make sure gradient tracking is on, and do a pass over the training data
-            avg_loss, avg_acc = train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, writer)  
+            avg_loss, avg_acc = train_epoch(epoch, input_dim, model, training_loader, optimizer, criterion, weights, writer)  
 
 
-            ### model evaluation
+            ### model evaluation on validation data
             model.eval()                                # Set the model to evaluation mode, disabling dropout and using population statistics for batch normalization. 
             with torch.no_grad():
                 X_val, y_val = next(iter(validation_loader))
                 X_val = X_val.to(device)
-                y_val = y_val.to(device)
+                y_val = torch.flatten(y_val).long().to(device)
                 # print(f'model is in cuda ? {next(model.parameters()).is_cuda}, inputs in cuda ? {X_val.is_cuda}')
 
                 out   = model(X_val,None)
@@ -186,15 +189,18 @@ def train():
                 scheduler.step(avg_vloss)  
 
                 y_pred    = torch.argmax(out,1).type(torch.float32)
+                
+                # avg_vacc = weighted_balanced_accuracy(y_pred, y_val, weights)
                 avg_vacc = performace_metrics(y_pred, y_val)
-            
-            if es(model, avg_vloss.item(), epoch):
+
+            if es(model, avg_vloss.item(), epoch) or epoch == epochs:
                 done = True
                 destination= PATH+'_'+f'{es.best_epoch}'+'_BEST_VLoss_'+f'{es.best_vloss:0.2f}'
+                print(f'model saved to - {destination}')
                 torch.save(es.best_model, destination)
 
             ### log data to weights and biases
-            wandb.log( {"train_loss": avg_loss, "val_loss": avg_vloss.item() } )
+            wandb.log( {"train_loss": avg_loss, "val_loss": avg_vloss.item(), "train_accuracy": avg_acc, "val_accuracy": avg_vacc } )
             # metrics = {} # "train/epoch": global_step,
             # wandb.log(metrics)
 
@@ -213,7 +219,7 @@ def train():
             # writer.add_figure(f'Prediction:{file}', sn.heatmap(img_orig , ax=ax).get_figure(), global_step=epoch)
 
             # Save model
-            if avg_loss < best_loss:   # avg_vacc > best_vacc     
+            if avg_loss < best_loss:   # avg_vacc > best_vacc     avg_loss < best_loss
                 best_loss = avg_loss
                 best_acc  = avg_acc
 
@@ -229,6 +235,29 @@ def train():
             # wandb.log({"test_prediction":log_table})
 
         writer.add_hparams({'lr': config.lr}, {'tr_loss': best_loss, 'tr_acc': best_acc})
+        
+        if done or epoch == epochs:
+            ### saved model training, validation, and testing accuracy
+            model     = build_model(network, yaml_model, config, device, input_dim, output_dim)
+            model.load_state_dict(torch.load(destination))
+
+            summary(model, [1, input_dim], None)
+
+            model.eval()                                # Set the model to evaluation mode, disabling dropout and using population statistics for batch normalization. 
+            with torch.no_grad():
+                for label, loader in [('training', training_loader), ('validation', validation_loader), ('testing', testing_loader)]:
+                    X_test, y_test = next(iter(loader))
+                    X_test = X_test.to(device)
+                    y_test = torch.flatten(y_test).long().to(device)
+                    # print(f'model is in cuda ? {next(model.parameters()).is_cuda}, inputs in cuda ? {X_val.is_cuda}')
+
+                    out   = model(X_test,None)
+                    avg_tloss = criterion(out, torch.flatten(y_test).long())
+
+                    y_pred    = torch.argmax(out,1).type(torch.float32)
+                    # avg_tacc  = weighted_balanced_accuracy(y_pred, y_test, weights)
+                    avg_tacc  = performace_metrics(y_pred, y_test)
+                    print(f'{label} accuracy: {avg_tacc:0.4f}')
 
 # Start sweep job
 sweep_id = wandb.sweep(sweep=config, project="transformer-classifier")

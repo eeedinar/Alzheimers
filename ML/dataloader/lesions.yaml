@@ -3,8 +3,12 @@ parameters:
     value: 1.0
   qvalue_upper_bound :
     value: 1.45
+  mica_sub :
+    value: True
+  scaling :
+    value: False       
   column_names : 
-    value : {"Diffuse_Plaque":1., "Tissue":0.}  # {"Neurofibrillary_Tangle_(tau)":0.0, "Diffuse_Plaque":1., "Tissue":2.}      {"Paraffin":1.0, "Not_Paraffin":0.}        # "Tissue":2.  {"Diffuse_Plaque":0., "Neurofibrillary_Tangle_(tau)":1. , "Tau":2. ,"Neuritic_Plaque":3., "Tissue":4., "bkg":5.0 }
+    value : {"Neurofibrillary_Tangle_(tau)":1., "Diffuse_Plaque":1., "Neuritic_Plaque":1., "Tissue":0.}  # {"Paraffin":1.0, "Not_Paraffin":0.}        # "Tissue":2.  {"Diffuse_Plaque":0., "Neurofibrillary_Tangle_(tau)":1. , "Tau":2. ,"Neuritic_Plaque":3., "Tissue":4., "bkg":5.0 }
   Excel_File   : 
     value : "/Users/bashit.a/Documents/Alzheimer/Mar-2023/Mar-2023-Samples-updated.xlsx"   # "/home/bashit.a/Codes/ML/Mar-2023-Samples.xlsx"   "/Users/bashit.a/Documents/Alzheimer/Mar-2023/Mar-2023-Samples.xlsx"
   sheet        : 
@@ -14,4 +18,6 @@ parameters:
   sub_dir      : 
     value : "CSV_Conv-8-point"               # CSV_Conv-8-point  CSV
   val_files    : 
-    value : ["1948 V1-roi0_0_0_masked.h5"]   # ["1948_EC-roi1_0_0_masked.h5"]     # None ["1948_HIPPO-roi1_0_0_masked_intp.h5", "2428-roi1_0_0_masked_intp.h5"] ["1948 V1-roi0_0_0_masked.h5"]
+    value : ["1971_Hippo-roi1_0_0_masked_intp.h5"]   # "1898_CING-roi0_0_0_masked_intp.h5", ["1948_EC-roi1_0_0_masked.h5"]     # None ["1948_HIPPO-roi1_0_0_masked_intp.h5", "2428-roi1_0_0_masked_intp.h5"] ["1948 V1-roi0_0_0_masked.h5"]
+  test_files    : 
+    value : ["1948_PHG-roi0_0_0_masked.h5", "1971_Hippo-roi0_0_0_masked_intp.h5"]   # "1898_CING-roi0_0_0_masked_intp.h5", ["1948_EC-roi1_0_0_masked.h5"]     # None ["1948_HIPPO-roi1_0_0_masked_intp.h5", "2428-roi1_0_0_masked_intp.h5"] ["1948 V1-roi0_0_0_masked.h5"]

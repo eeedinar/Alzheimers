@@ -8,6 +8,9 @@ import glob, sys, os, inspect, ast
 import pandas as pd 
 from sklearn.utils.class_weight import compute_class_weight
 import pylab as plt
+import sys
+sys.setrecursionlimit(10000)
+print(f'current recursion limit set to: {sys.getrecursionlimit()}')
 
 # unequal level of list depth/nesting
 def flatten(S):
@@ -46,18 +49,24 @@ def get_dataframe_with_files_loc(file, sheet, BNL_dir, sub_dir):
 
 def train_val_split_dataset(func):
     def wrapper(*args, **kwargs):
-        file, sheet, BNL_dir, sub_dir, val_files = args
+        file, sheet, BNL_dir, sub_dir, val_files, test_files = args
         df = func(file, sheet, BNL_dir, sub_dir)
-        if val_files:
-            val_indices = [df[df['File']==file].index.item() for file in val_files]
-            df_val = df.iloc[val_indices]
-            df_val.reset_index(inplace=True)
-            df_train = df.drop(val_indices)
-            df_train.reset_index(inplace=True)
-            return df_train, df_val
-        else:
-            df_val = None
-            return df, df_val
+
+        def split_df(df, files):
+            if files:
+                val_indices = [df[df['File']==file].index.item() for file in files]
+                df_val = df.iloc[val_indices]
+                df_val.reset_index(inplace=True)
+                df_train = df.drop(val_indices)
+                df_train.reset_index(inplace=True)
+                return df_train, df_val
+            else:
+                df_val = None
+                return df, df_val
+
+        df_train, df_val  = split_df(df, val_files)
+        df_train, df_test = split_df(df_train, test_files)
+        return df_train, df_val, df_test
         # df_valid = df.iloc[indices]
         
     return wrapper
@@ -133,12 +142,18 @@ class XrayData(Dataset):
 
     def __init__(self, df, column_names, BNL_dir, sub_dir, lidx=0, uidx=690, mica_sub=True, mica_Iq = None, tissue_sub=False, tissue_Iq = None, tissue_sub_indices = (360, 420), seek_mf = (-12,12,0.01), scaling=False):
 
+        ### emptpy dataframe column is droped
+        compute_column_names = []
+        for column_name,label in column_names.items():
+            if len(df[column_name].dropna()):
+                compute_column_names.append((column_name,label))
+
         x_raw      = np.array([])
         labels_out = np.array([])
         frames_out = np.array([])
         files_out  = np.array([]) 
 
-        for column_name,label in column_names.items():
+        for column_name,label in compute_column_names:
             Iq_values, labels, frames, files =  get_intensities(df, column_name, label, BNL_dir, sub_dir)
             print(f'{column_name} : contains {frames.size} samples')
             x_raw         = np.vstack([x_raw, Iq_values]) if x_raw.size else Iq_values
@@ -150,7 +165,7 @@ class XrayData(Dataset):
             if isinstance(mica_Iq, np.ndarray):
                 self.Iq_bkg = mica_Iq
             else:
-                Iq_bkg , _, _, _ =  get_intensities(df, column_name='bkg', label=0, BNL_dir=BNL_dir, sub_dir=sub_dir)
+                Iq_bkg , _, _, _ =  get_intensities(df, column_name='bkg_model', label=0, BNL_dir=BNL_dir, sub_dir=sub_dir)
                 self.Iq_bkg = np.mean(Iq_bkg, axis=0)
                 file = open("mica_bkg", "wb")              # Open a binary file in write mode
                 np.save(file, self.Iq_bkg)                 # Save array to the file
@@ -329,41 +344,46 @@ def get_sonar_dataloaders(sonar_file):
 
     return weights, training_loader, validation_loader    
 
-def get_dataloaders_fixed_val_files(Excel_File, sheet, BNL_dir, sub_dir, column_names, val_files, lidx=0, uidx=690, mica_sub=True, scaling=False):
+def get_dataloaders_fixed_val_test_files(Excel_File, sheet, BNL_dir, sub_dir, column_names, val_files, test_files, lidx=0, uidx=690, mica_sub=True, scaling=False):
     batch_size  = 4096
 
-    split_dataset    = train_val_split_dataset(get_dataframe_with_files_loc)
-    df_train, df_val = split_dataset(Excel_File, sheet, BNL_dir, sub_dir, val_files)
+    split_dataset             = train_val_split_dataset(get_dataframe_with_files_loc)
+    df_train, df_val, df_test = split_dataset(Excel_File, sheet, BNL_dir, sub_dir, val_files, test_files)
 
     print('Setting Training Dataset ...')
     dataset_train = XrayData(df_train, column_names, BNL_dir, sub_dir, lidx=lidx, uidx=uidx, mica_sub=mica_sub, scaling=scaling)
     print('Setting Validation Dataset ...')
-    dataset_val   = XrayData(df_val, column_names, BNL_dir, sub_dir, lidx=lidx, uidx=uidx, mica_sub=mica_sub, scaling=scaling) if df_val else None
+    dataset_val   = XrayData(df_val, column_names, BNL_dir, sub_dir, lidx=lidx, uidx=uidx, mica_sub=mica_sub, scaling=scaling) if isinstance(df_val,pd.core.frame.DataFrame) else None
+    print('Setting Testing Dataset ...')
+    dataset_test  = XrayData(df_test, column_names, BNL_dir, sub_dir, lidx=lidx, uidx=uidx, mica_sub=mica_sub, scaling=scaling) if isinstance(df_test, pd.core.frame.DataFrame) else None
 
-    # Calculate weights
+    # Calculate weights on training set
     weights = compute_class_weight(class_weight="balanced", classes=np.unique(dataset_train.y), y=dataset_train.y.ravel())
     weights = torch.tensor(weights, dtype=torch.float32)
     print([f'weight {i} : {weight:0.2f} ' for i,weight in enumerate(weights)])
 
     training_loader   = DataLoader(dataset_train, batch_size=batch_size, num_workers=0)
-    validation_loader = DataLoader(dataset_val, batch_size=batch_size, num_workers=0) if dataset_val else None
-    print("training_loader size : {} ; validation_loader size : {}".format(len(training_loader), len(validation_loader) if validation_loader else None))
+    validation_loader = DataLoader(dataset_val,   batch_size=batch_size, num_workers=0) if dataset_val else None
+    testing_loader    = DataLoader(dataset_test,  batch_size=batch_size, num_workers=0) if dataset_test else None
+    print("training_loader size : {} ; validation_loader size : {} ; testing_loader size : {}".format(len(training_loader), len(validation_loader) if validation_loader else None, len(testing_loader) if testing_loader else None))
 
-    return weights, training_loader, validation_loader
+    return weights, training_loader, validation_loader, testing_loader
 
 if __name__ == '__main__':
     ### specs : names - file , columns
 
     lidx = 250
     uidx = 340
-    column_names= {"bkg":1. }    # {"Diffuse_Plaque":0., "Neurofibrillary_Tangle_(tau)":1. , "Tau":2. ,"Neuritic_Plaque":3., "Tissue":4., "bkg":5.0 }
+    column_names= {"Neuritic_Plaque":1., "Diffuse_Plaque":1., "Neurofibrillary_Tangle_(tau)":1., "Tissue":0.}  # "Tau":1., "Neuritic_Plaque":1., "Diffuse_Plaque":1., "Neurofibrillary_Tangle_(tau)":1.,   # {"Diffuse_Plaque":0., "Neurofibrillary_Tangle_(tau)":1. , "Tau":2. ,"Neuritic_Plaque":3., "Tissue":4., "bkg":5.0 }
     Excel_File  = "/Users/bashit.a/Documents/Alzheimer/Mar-2023/Mar-2023-Samples-updated.xlsx"   # "/home/bashit.a/Codes/ML/Mar-2023-Samples.xlsx"   "/Users/bashit.a/Documents/Alzheimer/Mar-2023/Mar-2023-Samples.xlsx"    sheet       = 'Mar-2023-Samples'
     BNL_dir     = '/Volumes/HDD/BNL-Data/Mar-2023'    # '/Volumes/HDD/BNL-Data/Mar-2023'         '/scratch/bashit.a/BNL-Data/Mar-2023'
     sub_dir     = "CSV_Conv-8-point"  # CSV_Conv-8-point  CSV
-    val_files   = None # ["1948 V1-roi0_0_0_masked.h5"] # None ["1948_HIPPO-roi1_0_0_masked_intp.h5", "2428-roi1_0_0_masked_intp.h5"]
+    val_files   = ["1898_CING-roi0_0_0_masked_intp.h5"]  # ["1948 V1-roi0_0_0_masked.h5"] # None # ["1948 V1-roi0_0_0_masked.h5"] # None ["1948_HIPPO-roi1_0_0_masked_intp.h5", "2428-roi1_0_0_masked_intp.h5"]
+    test_files  = ["1948 V1-roi0_0_0_masked.h5"]  # None ["1948 V1-roi0_0_0_masked.h5"]
     sheet       = 'Mar-2023-Samples'
     mica_sub = True
     scaling  = False
+    tissue_sub = False
     # print('Random Split Dataset -->')
     # weights, training_loader, validation_loader = get_dataloaders_random_split(Excel_File, sheet, BNL_dir, sub_dir, column_names, lidx=lidx, uidx=uidx)
     # train_dataiter = iter(training_loader)
@@ -375,7 +395,7 @@ if __name__ == '__main__':
     # print(type(val_data), val_data.shape, len(validation_loader))
 
     print('Fixed Validation Dataset -->')
-    weights, training_loader, validation_loader = get_dataloaders_fixed_val_files(Excel_File, sheet, BNL_dir, sub_dir, column_names, val_files, lidx=lidx, uidx=uidx, mica_sub=mica_sub, scaling=scaling)
+    weights, training_loader, validation_loader, testing_loader = get_dataloaders_fixed_val_test_files(Excel_File, sheet, BNL_dir, sub_dir, column_names, val_files, test_files, lidx=lidx, uidx=uidx, mica_sub=mica_sub, scaling=scaling)
     train_dataiter = iter(training_loader)
     train_data, train_label = next(train_dataiter)
     print(type(train_data), train_data.dtype, train_data.shape, train_label.shape, train_label.dtype, len(training_loader))
@@ -383,10 +403,15 @@ if __name__ == '__main__':
     plt.plot(train_data.detach().numpy().T)
     plt.show()
 
-    val_dataiter = iter(validation_loader)
-    val_data, val_label = next(val_dataiter)
-    print(type(val_data), val_data.dtype, val_data.shape, val_label.shape, val_label.dtype, len(validation_loader))
+    if validation_loader:
+        val_dataiter = iter(validation_loader)
+        val_data, val_label = next(val_dataiter)
+        print(type(val_data), val_data.dtype, val_data.shape, val_label.shape, val_label.dtype, len(validation_loader))
 
+    if testing_loader:
+        test_dataiter = iter(testing_loader)
+        test_data, test_label = next(test_dataiter)
+        print(type(test_data), test_data.dtype, test_data.shape, test_label.shape, test_label.dtype, len(testing_loader))
     # print(validation_loader.dataset.frames)
 
     for batch_idx, inputs in enumerate(training_loader):

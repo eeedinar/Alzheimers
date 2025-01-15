@@ -6,6 +6,6 @@ parameters:
   N : 
     value : 1
   dropout : 
-    value : 0.02
+    value : 0.05
   seq_len :
     value : 1
